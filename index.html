@@ -1,0 +1,1608 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kaustik-Lampe</title>
+<meta name="description" content="Kaustik-Lampe: 3D-Ansicht des Prototyps mit Tageslichtprojektor und Turbulenz-Antrieb, dazu eine interaktive Physik-Vorlesung mit Live-Simulationen.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Kaustik-Lampe">
+<meta property="og:description" content="Kaustik-Lampe: 3D-Ansicht des Prototyps mit Tageslichtprojektor und Turbulenz-Antrieb, dazu eine interaktive Physik-Vorlesung mit Live-Simulationen.">
+<meta property="og:url" content="https://chillchamp1.github.io/kaustik-lampe/">
+<meta property="og:image" content="https://chillchamp1.github.io/kaustik-lampe/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Spectral:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Tab-Leiste oben; darunter entweder die 3D-Szene (füllt den Rest) oder die Vorlesung (scrollt) */
+html, body { height: 100%; }
+body { background: #0a0f13; margin: 0; }
+.tabbar { height: 46px; display: flex; align-items: center; gap: 18px; padding-inline: 16px; background: #0a0f13;
+  border-bottom: 1px solid #22313a; font-family: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; color: #dbe6e9; position: relative; z-index: 3; }
+.tabbar b { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; }
+.tabbar nav { display: flex; gap: 4px; height: 100%; }
+.tabbar button { font: 500 14px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; color: #8b9fa7; background: none; border: 0;
+  border-bottom: 2px solid transparent; padding: 0 12px; cursor: pointer; height: 100%; }
+.tabbar button[aria-selected="true"] { color: #dbe6e9; border-bottom-color: #8fe6ee; }
+.tabbar button:focus-visible { outline: 2px solid #8fe6ee; outline-offset: -4px; }
+#tab-proto { height: calc(100% - 47px); }
+#tab-physik { min-height: calc(100% - 47px); }
+@media (max-width: 420px) { .tabbar b { display: none; } }
+#tab-proto {
+  --night: #0a0f13;
+  --panel: #10181d;
+  --line: #22313a;
+  --fg: #dbe6e9;
+  --muted: #8b9fa7;
+  --caustic: #8fe6ee;
+  --oil: #e2b866;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+html, #tab-proto { height: 100%; }
+#tab-proto { background: var(--night); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+#tab-proto .app { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: 100%; }
+#tab-proto #stage { position: relative; min-width: 0; overflow: hidden; }
+#tab-proto #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#tab-proto .head { position: absolute; left: 16px; top: 14px; right: 16px; pointer-events: none; }
+#tab-proto .head h1 { font-family: var(--display); font-weight: 700; font-size: clamp(20px, 3vw, 30px); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+#tab-proto .head p { margin: 2px 0 0; color: var(--muted); max-width: 52ch; }
+#tab-proto .labels { position: absolute; inset: 0; pointer-events: none; }
+#tab-proto .lbl { position: absolute; transform: translateY(-50%); font: 400 10.5px/1.2 var(--body); color: var(--muted);
+  white-space: nowrap; text-shadow: 0 0 4px var(--night), 0 0 2px var(--night); letter-spacing: 0.01em; }
+#tab-proto .leaders { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+#tab-proto .leaders path { fill: none; stroke: rgba(139, 159, 167, 0.55); stroke-width: 0.8; }
+#tab-proto .leaders path.dot { fill: rgba(219, 230, 233, 0.8); stroke: none; }
+#tab-proto .lbl.hidden-lbl { display: none; }
+#tab-proto .hint { position: absolute; left: 16px; bottom: 12px; color: var(--muted); font-size: 12px; pointer-events: none; }
+#tab-proto .status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-family: var(--mono); pointer-events: none; }
+#tab-proto .status[hidden] { display: none; }
+#tab-proto aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 18px 18px 28px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+#tab-proto h2 { font-family: var(--display); font-weight: 500; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+#tab-proto .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+#tab-proto button { font: 500 13px var(--body); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+#tab-proto button:hover { border-color: var(--muted); }
+#tab-proto button[aria-pressed="true"] { background: var(--caustic); color: var(--night); border-color: var(--caustic); }
+#tab-proto button:focus-visible, #tab-proto input:focus-visible { outline: 2px solid var(--caustic); outline-offset: 2px; }
+#tab-proto .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#tab-proto label { color: var(--muted); }
+#tab-proto input[type=range] { width: 100%; accent-color: var(--caustic); }
+#tab-proto .val { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+#tab-proto dl { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 4px 12px; margin: 0; }
+#tab-proto dt { color: var(--muted); }
+#tab-proto dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+#tab-proto table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#tab-proto th, #tab-proto td { padding: 4px 0; border-bottom: 1px solid var(--line); text-align: right; }
+#tab-proto th:first-child, #tab-proto td:first-child { text-align: left; color: var(--muted); font-weight: 400; }
+#tab-proto th { font-weight: 500; color: var(--muted); font-size: 12px; }
+#tab-proto td.ok { color: var(--caustic); }
+#tab-proto .parts { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+#tab-proto .parts li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; }
+#tab-proto .parts b { font-weight: 500; }
+#tab-proto .parts span.n { font-family: var(--mono); color: var(--caustic); }
+#tab-proto .parts p { margin: 0; color: var(--muted); grid-column: 2; }
+#tab-proto .note { color: var(--muted); font-size: 12px; }
+#tab-proto .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+#tab-proto .mhead { display: none; }
+#tab-proto .mhead h1 { font-family: var(--display); font-weight: 700; font-size: 22px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+#tab-proto .mhead p { margin: 4px 0 0; color: var(--muted); }
+@media (max-width: 860px) {
+#tab-proto .app { grid-template-columns: 1fr; grid-template-rows: 62vh auto; height: auto; }
+#tab-proto #stage { height: 62vh; }
+#tab-proto aside { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+#tab-proto .head, #tab-proto .hint, #tab-proto .labels, #tab-proto .lblrow { display: none; }
+#tab-proto .mhead { display: block; }
+}
+@media (prefers-reduced-motion: reduce) {
+#tab-proto * { scroll-behavior: auto; }
+}
+
+#tab-physik {
+  --paper: #edf1f2;
+  --ink: #13232b;
+  --muted: #566a72;
+  --rule: #c7d2d5;
+  --water: #2c6e9b;
+  --oil: #a8741a;
+  --accent: #0b7f97;
+  --panel: #07141b;
+  --panel-ink: #d6e8ee;
+  --panel-muted: #7f9aa4;
+  --chip: #dde6e8;
+  --font-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Spectral", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) #tab-physik {
+    --paper: #0c161b; --ink: #dce7eb; --muted: #8ea3ab; --rule: #22333a; --water: #5ba3d6;
+    --oil: #e0a944; --accent: #4cc6dd; --panel: #040d12; --panel-ink: #d6e8ee; --panel-muted: #7f9aa4;
+    --chip: #17252b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] #tab-physik {
+  --paper: #0c161b; --ink: #dce7eb; --muted: #8ea3ab; --rule: #22333a; --water: #5ba3d6;
+  --oil: #e0a944; --accent: #4cc6dd; --panel: #040d12; --panel-ink: #d6e8ee; --panel-muted: #7f9aa4;
+  --chip: #17252b; color-scheme: dark;
+}
+#tab-physik * { box-sizing: border-box; }
+#tab-physik { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 1.06rem; line-height: 1.6; }
+#tab-physik .wrap { max-width: 1160px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); }
+#tab-physik h1, #tab-physik h2, #tab-physik h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+#tab-physik h2 { font-size: clamp(1.5rem, 2.6vw, 2rem); font-weight: 600; letter-spacing: -0.01em; }
+#tab-physik h3 { font-size: 1.05rem; font-weight: 600; }
+#tab-physik p { margin: 0; max-width: 65ch; }
+#tab-physik .mono, #tab-physik output, #tab-physik .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+#tab-physik .eyebrow { font-family: var(--font-display); font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+#tab-physik .hero { position: relative; background: var(--panel); color: var(--panel-ink); overflow: hidden; }
+#tab-physik .hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: .9; }
+#tab-physik .hero .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(4,13,18,.92) 0%, rgba(4,13,18,.72) 42%, rgba(4,13,18,0) 75%); }
+#tab-physik .hero .inner { position: relative; padding-block: clamp(56px, 9vw, 110px); display: grid; gap: 18px; }
+#tab-physik .hero h1 { font-size: clamp(2.3rem, 6vw, 4.4rem); font-weight: 700; letter-spacing: -0.025em; max-width: 13ch; }
+#tab-physik .hero p { color: var(--panel-ink); max-width: 46ch; font-size: 1.12rem; }
+#tab-physik .hero .eyebrow { color: #7fd8ea; }
+#tab-physik .hero .meta { font-family: var(--font-mono); font-size: .8rem; color: var(--panel-muted); }
+#tab-physik .lesson { display: grid; grid-template-columns: minmax(0, 33rem) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); padding-block: clamp(40px, 6vw, 72px); border-top: 1px solid var(--rule); align-items: start; }
+#tab-physik .lesson:first-of-type { border-top: 0; }
+#tab-physik .text { display: grid; gap: 16px; min-width: 0; }
+#tab-physik .text .num-badge { font-family: var(--font-mono); color: var(--muted); font-size: .85rem; }
+#tab-physik .formula { font-family: var(--font-mono); font-size: .9rem; background: var(--chip); padding: 12px 14px; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+#tab-physik .note { font-size: .93rem; color: var(--muted); }
+#tab-physik .takeaway { border-left: 3px solid var(--accent); padding-left: 14px; font-style: italic; }
+@media (max-width: 880px) {
+#tab-physik .lesson { grid-template-columns: minmax(0, 1fr); }
+}
+#tab-physik .fig { background: var(--panel); color: var(--panel-ink); border-radius: 10px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
+#tab-physik .fig canvas { width: 100%; display: block; border-radius: 6px; background: #000; }
+#tab-physik .fig .cap { font-family: var(--font-display); font-size: .82rem; color: var(--panel-muted); letter-spacing: .02em; }
+#tab-physik .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 18px; }
+#tab-physik .ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; font-family: var(--font-display); font-size: .86rem; }
+#tab-physik .ctl label { color: var(--panel-ink); }
+#tab-physik .ctl output { color: #8fe0f0; font-size: .82rem; }
+#tab-physik .ctl input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: #3fbcd6; }
+#tab-physik .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+#tab-physik .ro { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); border-radius: 6px; padding: 8px 10px; display: grid; gap: 2px; }
+#tab-physik .ro span { font-family: var(--font-display); font-size: .74rem; color: var(--panel-muted); letter-spacing: .03em; }
+#tab-physik .ro b { font-family: var(--font-mono); font-weight: 500; font-size: .95rem; color: var(--panel-ink); font-variant-numeric: tabular-nums; }
+#tab-physik .ro.warn b { color: #f0b35a; }
+#tab-physik .ro.good b { color: #8fe0a8; }
+#tab-physik .seg { display: inline-flex; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; overflow: hidden; }
+#tab-physik .seg button { font: 600 .82rem var(--font-display); background: transparent; color: var(--panel-ink); border: 0; padding: 7px 14px; cursor: pointer; }
+#tab-physik .seg button[aria-pressed="true"] { background: #3fbcd6; color: #04161d; }
+#tab-physik button:focus-visible, #tab-physik input:focus-visible { outline: 2px solid #8fe0f0; outline-offset: 2px; }
+#tab-physik .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#tab-physik .duo > div { display: grid; gap: 8px; min-width: 0; }
+@media (max-width: 520px) {
+#tab-physik .duo { grid-template-columns: 1fr; }
+}
+#tab-physik .meter { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-family: var(--font-display); font-size: .8rem; color: var(--panel-muted); }
+#tab-physik .meter .bar { height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+#tab-physik .meter .bar i { display: block; height: 100%; width: 0; background: #3fbcd6; transition: width .4s; }
+#tab-physik .meter b { font-family: var(--font-mono); color: var(--panel-ink); font-weight: 500; min-width: 3.2em; text-align: right; }
+#tab-physik .tbl-wrap { overflow-x: auto; }
+#tab-physik table { border-collapse: collapse; font-size: .9rem; width: 100%; }
+#tab-physik th, #tab-physik td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--rule); }
+#tab-physik th { font-family: var(--font-display); font-weight: 600; font-size: .8rem; color: var(--muted); letter-spacing: .03em; }
+#tab-physik td.num { text-align: right; }
+#tab-physik .bar-inline { display: inline-block; height: 8px; background: var(--accent); border-radius: 2px; vertical-align: middle; }
+#tab-physik .lab { padding-block: clamp(40px, 6vw, 72px); border-top: 1px solid var(--rule); display: grid; gap: 22px; }
+#tab-physik .lab-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) {
+#tab-physik .lab-grid { grid-template-columns: minmax(0, 1fr); }
+}
+#tab-physik .side { display: grid; gap: 14px; }
+#tab-physik footer { padding-block: 40px 60px; border-top: 1px solid var(--rule); color: var(--muted); font-size: .9rem; display: grid; gap: 10px; }
+#tab-physik .play { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; font: 600 .85rem var(--font-display); background: var(--ink); color: var(--paper); border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
+
+#tab-proto { height: calc(100% - 47px); }
+@media (max-width: 860px) { #tab-proto { height: auto; } }
+</style>
+
+<header class="tabbar">
+  <b>Kaustik-Lampe</b>
+  <nav role="tablist" aria-label="Ansicht wählen">
+    <button role="tab" id="t-proto" aria-controls="tab-proto" aria-selected="true">Prototyp</button>
+    <button role="tab" id="t-physik" aria-controls="tab-physik" aria-selected="false">Physik erklärt</button>
+  </nav>
+</header>
+
+<div id="tab-proto" role="tabpanel" aria-labelledby="t-proto">
+
+
+<div class="app">
+  <div id="stage">
+    <div class="head">
+      <h1>Kaustik-Lampe · Prototyp</h1>
+      <p>Prototyp mit Tageslichtprojektor: Wasser unter einer Ölmischung fast gleicher Dichte, sanft durchwirbelt von einem Magnetrührer unter einem Lochblech. Grenzfläche und Deckenmuster stammen aus derselben Simulation.</p>
+    </div>
+    <div class="labels" id="labels"></div>
+    <div class="status" id="status">Lade Simulationsdaten …</div>
+    <div class="hint">Ziehen zum Drehen · Scrollen/Pinch zum Zoomen</div>
+  </div>
+  <aside>
+    <section class="mhead">
+      <h1>Kaustik-Lampe · Prototyp</h1>
+      <p>Prototyp mit Tageslichtprojektor: Wasser unter einer Ölmischung fast gleicher Dichte, sanft durchwirbelt von einem Magnetrührer unter einem Lochblech. Ziehen zum Drehen, Pinch zum Zoomen.</p>
+    </section>
+    <section>
+      <h2>Ansicht</h2>
+      <div class="seg" id="views">
+        <button data-view="room" aria-pressed="true">Raum</button>
+        <button data-view="lamp" aria-pressed="false">Projektor</button>
+        <button data-view="tank" aria-pressed="false">Tank</button>
+        <button data-view="ceiling" aria-pressed="false">Decke</button>
+      </div>
+    </section>
+    <section>
+      <h2>Deckenmuster</h2>
+      <div class="seg" id="source">
+        <button data-src="lamp" aria-pressed="true">Prototyp (Simulation)</button>
+        <button data-src="pool" aria-pressed="false">Pool-Referenz</button>
+      </div>
+    </section>
+    <section>
+      <h2>Rand an der Decke</h2>
+      <div class="seg" id="edge">
+        <button data-edge="soft" aria-pressed="true">Weich (Verlaufsfolie)</button>
+        <button data-edge="hard" aria-pressed="false">Hart (Maske am Deckel)</button>
+      </div>
+      <p class="note" style="margin:8px 0 0">Weich: Eine Folie mit Grauverlauf liegt auf der Glasplatte, ~12 cm unter der Fokusebene, und wird deshalb unscharf abgebildet. Die Deckelmaske ist 2–3 cm größer und bestimmt den Rand nicht mehr. Der Kopf sitzt ~1,5 cm tiefer (Vergrößerung ~10 statt 8,7), damit die helle Fläche gleich groß bleibt.</p>
+    </section>
+    <section>
+      <h2>Wiedergabe</h2>
+      <div class="seg" id="speed">
+        <button id="play" aria-pressed="true">Läuft</button>
+        <button data-speed="1" aria-pressed="true">1×</button>
+        <button data-speed="0.25" aria-pressed="false">Zeitlupe ¼</button>
+      </div>
+      <div style="margin-top:12px">
+        <div class="row"><label for="exag">Wellenhöhe überhöht</label><span class="val" id="exagVal">×8</span></div>
+        <input id="exag" type="range" min="1" max="40" step="1" value="8">
+      </div>
+      <div class="row" style="margin-top:8px"><label for="lensc">Linsenwirkung einfärben</label><input id="lensc" type="checkbox" checked></div>
+      <p class="note" style="margin:4px 0 0">Die Grenzfläche selbst ist nur sanft hügelig. Hell: Stellen, die Licht bündeln. Erst unterwegs zur Decke kreuzen sich diese Bündel zu den hellen Linien.</p>
+      <div class="row lblrow" style="margin-top:8px"><label for="lbls">Beschriftung</label><input id="lbls" type="checkbox"></div>
+    </section>
+    <section>
+      <h2>Arbeitspunkt</h2>
+      <dl id="spec"></dl>
+    </section>
+    <section>
+      <h2>Kennzahlen gegen Pool</h2>
+      <table id="kpi"><thead><tr><th>Kennzahl</th><th>Pool</th><th>Prototyp</th></tr></thead><tbody></tbody></table>
+      <p class="note">Simulation, Ausschnitt 84 % des Lichtfelds; Pool = ruhiges Becken mit 1 m Wellen. Gleichtakt: Korrelation der Bildänderung zwischen 4 × 4 Blöcken, der Pool-Wert stammt aus dem echten Referenzvideo. Turbulenz ist als zufälliges Druckfeld modelliert; Rührstufe und Lochblech müssen im Versuch eingestellt werden.</p>
+    </section>
+    <section>
+      <h2>Aufbau von unten nach oben</h2>
+      <ol class="parts" id="parts"></ol>
+    </section>
+  </aside>
+</div>
+
+
+</div>
+
+<div id="tab-physik" role="tabpanel" aria-labelledby="t-physik" hidden>
+
+
+<section class="hero" aria-label="Einleitung">
+  <canvas id="heroCv" width="256" height="256" aria-hidden="true"></canvas>
+  <div class="shade"></div>
+  <div class="wrap inner">
+    <span class="eyebrow">Vorlesung · Experimentalphysik für die Wohnzimmerdecke</span>
+    <h1>Wie Wellen Licht bündeln</h1>
+    <p>Hinter dir läuft live das, was die Lampe an die Decke werfen soll: Licht, das durch eine leicht gewellte Grenzfläche zwischen Wasser und Öl fällt. In sechs Schritten klären wir, welcher Stoffwert an welchem Rädchen dreht.</p>
+    <span class="meta">Wasser 8 cm · Ölmischung IPM + Benzylbenzoat 12 mm · σ ≈ 2 mN/m · Turbulenz von unten</span>
+  </div>
+</section>
+
+<main class="wrap">
+
+<!-- 1 -->
+<section class="lesson" id="optik">
+  <div class="text">
+    <span class="num-badge">Schritt 1 von 6</span>
+    <h2>Jede Welle ist eine Linse</h2>
+    <p>Licht kommt von unten aus dem Projektor und läuft senkrecht nach oben. An der Grenzfläche wechselt es vom Wasser (n₁ = 1,333) ins Öl (n₂ ≈ 1,49). Ist die Grenzfläche geneigt, knickt der Strahl ab: Das ist das Brechungsgesetz von Snellius.</p>
+    <p>Ein Wellenberg wirkt dabei wie eine schwache Sammellinse, ein Tal wie eine Zerstreuungslinse. In einer bestimmten Höhe treffen sich die Strahlen vieler Berge: Dort entstehen die hellen Linien, die Kaustik. Für kleine Neigungen gilt einfach:</p>
+    <div class="formula">Ablenkung ≈ (n₂ − n₁) · Neigung   →   Versatz an der Decke ≈ D · Δn · ∂η/∂x</div>
+    <p>Drei Folgerungen: Ohne Brechzahlsprung (Δn = 0) gibt es kein Muster. Doppeltes Δn wirkt wie doppelte Wellenhöhe. Und der Abstand D, beim Tageslichtprojektor der Fokus, ist der Kontrastregler: zu kurz ist es flau, zu lang zerfasert es.</p>
+    <p class="takeaway">Die Stoffwerte entscheiden nur, wie stark die Linsen sind. Wie sie sich bewegen, entscheidet die Welle.</p>
+  </div>
+  <div class="fig">
+    <span class="cap">Querschnitt durch den Tank · Höhen nicht maßstäblich, Wellenhöhe überhöht gezeichnet</span>
+    <canvas id="rayCv" width="640" height="420" aria-label="Strahlengang durch die gewellte Grenzfläche"></canvas>
+    <div class="controls">
+      <div class="ctl"><label for="r_n2">Brechzahl Öl n₂</label><output id="r_n2o"></output><input id="r_n2" type="range" min="1.333" max="1.60" step="0.001" value="1.49"></div>
+      <div class="ctl"><label for="r_a">Wellenhöhe (rms)</label><output id="r_ao"></output><input id="r_a" type="range" min="0" max="0.6" step="0.01" value="0.25"></div>
+      <div class="ctl"><label for="r_d">Abstand D (Fokus)</label><output id="r_do"></output><input id="r_d" type="range" min="0.1" max="2.5" step="0.01" value="1.0"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="lesson" id="dichte">
+  <div class="text">
+    <span class="num-badge">Schritt 2 von 6</span>
+    <h2>Schwerkraft in Zeitlupe</h2>
+    <p>Warum überhaupt zwei Flüssigkeiten? Eine Wasserwelle schwappt so schnell, wie die Schwerkraft sie zurückzieht. Liegt aber Öl statt Luft über dem Wasser, drückt das Öl mit seinem Auftrieb dagegen. Übrig bleibt nur die <em>reduzierte Schwerkraft</em>:</p>
+    <div class="formula">g′ = g · (ρ₁ − ρ₂) / (ρ₁ + ρ₂)</div>
+    <p>Isopropylmyristat (IPM) ist mit 853 kg/m³ deutlich leichter als Wasser. Benzylbenzoat ist mit 1118 kg/m³ schwerer. Mischt man beide, landet man knapp unter der Wasserdichte, und g′ schrumpft auf etwa ein Sechzigstel. Dieselbe Welle schwappt dann viel langsamer: die ruhigen ~1 Hz, die wir wollen. Nebenbei hebt Benzylbenzoat die Brechzahl, und das stärkt die Linsen aus Schritt 1.</p>
+    <p>Der Preis: Je näher man der Wasserdichte kommt, desto empfindlicher reagiert das Tempo auf Temperatur. Öl dehnt sich stärker aus als Wasser; pro Kelvin ändert sich Δρ um rund 0,5 kg/m³. Bei 55 % Benzylbenzoat wird das Öl schwerer als Wasser, und die Schichtung kippt.</p>
+    <p class="takeaway">Die Dichtedifferenz ist das Gaspedal der Lampe.</p>
+  </div>
+  <div class="fig">
+    <span class="cap">Gleiche Wellenlänge, echte Geschwindigkeit · oben Pool (Wasser/Luft), unten Lampe (Wasser/Öl)</span>
+    <canvas id="slowCv" width="640" height="300" aria-label="Vergleich der Wellengeschwindigkeit Pool und Lampe"></canvas>
+    <div class="controls">
+      <div class="ctl"><label for="s_bb">Anteil Benzylbenzoat</label><output id="s_bbo"></output><input id="s_bb" type="range" min="0" max="0.56" step="0.005" value="0.42"></div>
+      <div class="ctl"><label for="s_lam">Wellenlänge λ</label><output id="s_lamo"></output><input id="s_lam" type="range" min="1" max="10" step="0.1" value="4"></div>
+    </div>
+    <div class="readouts">
+      <div class="ro"><span>Dichte Öl ρ₂</span><b id="s_rho">–</b></div>
+      <div class="ro"><span>Δρ zum Wasser</span><b id="s_drho">–</b></div>
+      <div class="ro"><span>g′ / g</span><b id="s_g">–</b></div>
+      <div class="ro"><span>Frequenz Pool</span><b id="s_fp">–</b></div>
+      <div class="ro"><span>Frequenz Lampe</span><b id="s_fl">–</b></div>
+      <div class="ro"><span>Brechzahl n₂</span><b id="s_n">–</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="lesson" id="tensid">
+  <div class="text">
+    <span class="num-badge">Schritt 3 von 6</span>
+    <h2>Die Haut der Grenzfläche</h2>
+    <p>Neben der Schwerkraft zieht noch eine zweite Kraft die Grenzfläche glatt: die Grenzflächenspannung σ, eine Art gespannte Haut. Sie wirkt umso stärker, je enger die Wellen gekrümmt sind. Beide Rückstellkräfte stecken in der Dispersionsrelation, dem wichtigsten Satz dieser Vorlesung:</p>
+    <div class="formula">ω² = (Δρ·g·k + σ·k³) / (ρ₁·coth kh₁ + ρ₂·coth kh₂),   k = 2π/λ</div>
+    <p>Lange Wellen gehorchen der Schwerkraft, kurze der Haut. Dazwischen liegt bei der Kapillarlänge λ_c = 2π·√(σ / Δρg) die <em>langsamste</em> Welle überhaupt. Im Diagramm ist das das Tal der Kurve.</p>
+    <p>Wasser gegen reines Öl hat σ ≈ 20 mN/m. Ein Tensid setzt sich mit dem wasserliebenden Kopf ins Wasser und dem fettliebenden Schwanz ins Öl und macht die Haut schlaffer. Bei ~2 mN/m rückt das Tal zu kurzen Wellen, und unsere 3–5-cm-Wellen werden zu reinen, ruhigen Schwerewellen.</p>
+    <p>Zwei Nebenwirkungen: Eine Tensidhaut wehrt sich gegen Dehnen und dämpft dadurch Wellen (Marangoni-Effekt, der alte Seemannstrick mit dem Öl auf dem Meer). Und je schlaffer die Haut, desto leichter reißt eine Strömung Öltröpfchen ins Wasser: Emulsion.</p>
+    <p class="takeaway">σ entscheidet, ob die Grenzfläche wie Wasser schwappt oder wie Gelee zittert.</p>
+  </div>
+  <div class="fig">
+    <span class="cap">Grenzfläche im Molekülbild · darunter Phasengeschwindigkeit c = ω/k gegen Wellenlänge</span>
+    <canvas id="molCv" width="640" height="120" aria-label="Tensidmoleküle an der Grenzfläche"></canvas>
+    <canvas id="dispCv" width="640" height="330" aria-label="Dispersionsdiagramm"></canvas>
+    <div class="controls">
+      <div class="ctl"><label for="t_s">Tensid-Menge</label><output id="t_so"></output><input id="t_s" type="range" min="0" max="1" step="0.01" value="0.95"></div>
+      <div class="ctl"><label for="t_bb">Anteil Benzylbenzoat</label><output id="t_bbo"></output><input id="t_bb" type="range" min="0" max="0.54" step="0.005" value="0.42"></div>
+    </div>
+    <div class="readouts">
+      <div class="ro"><span>Grenzflächenspannung σ</span><b id="t_sig">–</b></div>
+      <div class="ro"><span>Kapillarlänge λ_c</span><b id="t_lc">–</b></div>
+      <div class="ro"><span>bei λ = 4 cm: Schwere : Haut</span><b id="t_ratio">–</b></div>
+      <div class="ro" id="t_emr"><span>Emulsion ab Scherung</span><b id="t_em">–</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="lesson" id="daempfung">
+  <div class="text">
+    <span class="num-badge">Schritt 4 von 6</span>
+    <h2>Wie weit eine Welle kommt</h2>
+    <p>Jede Welle verliert Energie. Fast die ganze Reibung passiert in einer hauchdünnen Schicht direkt an der Grenzfläche: Wasser und Öl gleiten dort gegeneinander, und ihre Zähigkeit (Viskosität) bremst. Wie weit die Welle kommt, ergibt sich aus ihrer Gruppengeschwindigkeit geteilt durch die Dämpfungsrate:</p>
+    <div class="formula">Abklinglänge L_d = c_g / γ</div>
+    <p>Für unsere langsamen Wellen sind das nur 4–7 cm. Ein Tensid verkürzt die Strecke weiter. Rechts schwingt ein Stab am linken Tankrand: Die Ringe sterben lange vor der Tankmitte (17,5 cm).</p>
+    <p>Daraus folgt die wichtigste Konstruktionsregel der Lampe: Wellenmacher am Rand können die Fläche nicht beleben. Die Anregung muss <em>überall unter der Fläche</em> stattfinden.</p>
+    <p class="takeaway">Kurze Reichweite heißt: Jede Stelle braucht ihren eigenen Antrieb.</p>
+  </div>
+  <div class="fig">
+    <span class="cap">Draufsicht auf 35 cm Tank · Anregung am linken Rand, gestrichelt die Abklinglänge</span>
+    <canvas id="rippleCv" width="640" height="300" aria-label="Abklingende Ringwellen"></canvas>
+    <div class="controls">
+      <div class="ctl"><label for="d_lam">Wellenlänge λ</label><output id="d_lamo"></output><input id="d_lam" type="range" min="1.5" max="12" step="0.1" value="4"></div>
+      <div class="ctl"><label for="d_f">Zusatzdämpfung durch Tensid</label><output id="d_fo"></output><input id="d_f" type="range" min="1" max="3" step="0.05" value="1"></div>
+    </div>
+    <div class="readouts">
+      <div class="ro"><span>Frequenz</span><b id="d_fr">–</b></div>
+      <div class="ro"><span>Gruppengeschw. c_g</span><b id="d_cg">–</b></div>
+      <div class="ro"><span>Abklinglänge L_d</span><b id="d_ld">–</b></div>
+      <div class="ro" id="d_midr"><span>Rest in Tankmitte</span><b id="d_mid">–</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="lesson" id="antrieb">
+  <div class="text">
+    <span class="num-badge">Schritt 5 von 6</span>
+    <h2>Gleichtakt oder Turbulenz</h2>
+    <p>Jetzt wird es überraschend. Man könnte meinen, ein Muster wirkt getaktet, wenn sein Flimmern eine scharfe Frequenz hat. Unsere Messungen am echten Pool-Video sagen etwas anderes: Entscheidend ist, ob <em>verschiedene Stellen unabhängig voneinander</em> schwappen.</p>
+    <p>Links treibt ein gemeinsamer Takt die ganze Fläche an, so wie ein starrer Rahmen. Rechts wird jede Stelle von zufälligen Wirbeln geschubst, die entstehen, wandern und zerfallen: Turbulenz. Die Statistik ist in beiden Fällen gleich. Trotzdem pulsiert links die ganze Fläche gemeinsam.</p>
+    <p>Messen lässt sich das so: Man teilt das Bild in Viertel und korreliert, wie stark sich jedes Viertel von Bild zu Bild ändert. 0 heißt unabhängig wie im Meer, 1 heißt alles im Gleichschritt.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Gemessen in der Simulation (4 × 4 Blöcke)</th><th>Gleichtakt</th><th></th></tr></thead>
+        <tbody id="gtTable"></tbody>
+      </table>
+    </div>
+    <p class="takeaway">Ein organisches Muster braucht viele unabhängige Anreger. Turbulenz liefert unendlich viele, kostenlos.</p>
+  </div>
+  <div class="fig">
+    <span class="cap">Gleiche Flüssigkeiten, gleiche Wellenstärke · nur die Art des Antriebs unterscheidet sich</span>
+    <div class="duo">
+      <div>
+        <canvas id="taktCv" width="256" height="256" aria-label="Kaustik bei gemeinsamem Takt"></canvas>
+        <h3 style="font-size:.9rem">Ein gemeinsamer Takt</h3>
+        <div class="meter"><span>Gleichtakt</span><span class="bar"><i id="m_takt"></i></span><b id="m_takt_v">…</b></div>
+      </div>
+      <div>
+        <canvas id="turbCv" width="256" height="256" aria-label="Kaustik bei turbulenter Anregung"></canvas>
+        <h3 style="font-size:.9rem">Turbulenz von unten</h3>
+        <div class="meter"><span>Gleichtakt</span><span class="bar"><i id="m_turb"></i></span><b id="m_turb_v">…</b></div>
+      </div>
+    </div>
+    <span class="cap">Der Messwert braucht ~8 s, bis er sich eingependelt hat.</span>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="lab" id="labor">
+  <div style="display:grid;gap:12px">
+    <span class="num-badge mono" style="color:var(--muted);font-size:.85rem">Schritt 6 von 6</span>
+    <h2>Das Labor: alle Rädchen auf einmal</h2>
+    <p>Hier läuft dasselbe Modell wie in unserer Python-Simulation, nur kleiner: lineare Grenzflächenwellen mit echter Dispersion und Dämpfung, angetrieben von einem zufälligen Druckfeld, dazu Strahlablenkung bis zur Decke. Dreh an den Reglern und beobachte, was mit Zellgröße, Tempo und Kontrast passiert.</p>
+  </div>
+  <div class="lab-grid">
+    <div class="fig">
+      <span class="cap">Ausschnitt 25 × 25 cm der Grenzfläche, projiziert</span>
+      <canvas id="labCv" width="256" height="256" aria-label="Kaustik-Labor"></canvas>
+      <div class="meter"><span>Gleichtakt</span><span class="bar"><i id="m_lab"></i></span><b id="m_lab_v">…</b></div>
+    </div>
+    <div class="side">
+      <div class="fig">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span class="cap">Antrieb</span>
+          <div class="seg" role="group" aria-label="Antrieb">
+            <button type="button" id="l_turb" aria-pressed="true">Turbulenz</button>
+            <button type="button" id="l_takt" aria-pressed="false">Ein Takt</button>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="ctl"><label for="l_bb">Anteil Benzylbenzoat</label><output id="l_bbo"></output><input id="l_bb" type="range" min="0.2" max="0.54" step="0.005" value="0.42"></div>
+          <div class="ctl"><label for="l_sig">Grenzflächenspannung σ</label><output id="l_sigo"></output><input id="l_sig" type="range" min="0.5" max="25" step="0.1" value="2"></div>
+          <div class="ctl"><label for="l_ell">Wirbelgröße</label><output id="l_ello"></output><input id="l_ell" type="range" min="0.5" max="2.5" step="0.05" value="1.2"></div>
+          <div class="ctl"><label for="l_amp">Wirbelstärke (Druck)</label><output id="l_ampo"></output><input id="l_amp" type="range" min="0.01" max="0.25" step="0.005" value="0.08"></div>
+          <div class="ctl"><label for="l_d">Fokus D</label><output id="l_do"></output><input id="l_d" type="range" min="0.2" max="2.5" step="0.01" value="1.2"></div>
+          <div class="ctl"><label for="l_damp">Zusatzdämpfung (Tensid)</label><output id="l_dampo"></output><input id="l_damp" type="range" min="1" max="3" step="0.05" value="1"></div>
+        </div>
+      </div>
+      <div class="fig">
+        <div class="readouts">
+          <div class="ro"><span>Δρ / g′</span><b id="o_drho">–</b></div>
+          <div class="ro"><span>Brechzahlsprung Δn</span><b id="o_dn">–</b></div>
+          <div class="ro"><span>Hauptwelle λ</span><b id="o_lam">–</b></div>
+          <div class="ro"><span>deren Frequenz</span><b id="o_f">–</b></div>
+          <div class="ro"><span>Kapillarlänge λ_c</span><b id="o_lc">–</b></div>
+          <div class="ro"><span>Abklinglänge</span><b id="o_ld">–</b></div>
+          <div class="ro"><span>Wirbelgeschw. u′</span><b id="o_u">–</b></div>
+          <div class="ro" id="o_emr"><span>Emulsion ab</span><b id="o_em">–</b></div>
+          <div class="ro"><span>Neigung rms</span><b id="o_sl">–</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p><strong>Modellannahmen.</strong> Lineare Wellen an der Grenzfläche mit Zwei-Schichten-Dispersion (Wasser 8 cm, Öl 12 mm, starrer Boden und Deckel). Dämpfung aus Grenzschicht-, Volumen- und Wandreibung, Tensid-Dämpfung als einstellbarer Faktor. Turbulenz als zufälliges Druckfeld mit Wirbelgröße ℓ und Lebensdauer ~1 s (kleine Wirbel kürzer). Optik paraxial: Versatz = D·Δn·Neigung. Ölmischung linear interpoliert zwischen IPM (853 kg/m³, n = 1,4325) und Benzylbenzoat (1118 kg/m³, n = 1,568). Die Tensid-Skala in Schritt 3 ist illustrativ; den echten Wert muss man messen.</p>
+  <p>Gemessene Gleichtakt-Werte aus <span class="mono">spectrum_match.py</span>, Stand 06.10.2026.</p>
+</footer>
+</main>
+
+<button class="play" id="playBtn" type="button">Pause</button>
+
+
+</div>
+
+<script>
+// Kennzahlen (Simulation): ruhiger Pool mit 1 m Wellen gegen den Prototyp
+// (Ölmischung rho 965, sigma 2 mN/m, Wasser 8 cm, Turbulenz mit 1,2-cm-Wirbeln, Fokusstrecke 1,2 m)
+window.DESIGN = { kpi: [
+  ["Flimmerfrequenz", "1,5 Hz", "0,7 Hz", true],
+  ["Zellgröße / Lichtfeld", "11 %", "12,5 %", true],
+  ["Zellen im Lichtfeld", "66", "66", true],
+  ["Linienkontrast", "6,6", "6,7", true],
+  ["Zell-Lebensdauer", "0,10 s", "0,38 s", true],
+  ["Gleichtakt", "0,03", "−0,01", true],
+] };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const protoPane = document.getElementById("tab-proto"), physPane = document.getElementById("tab-physik");
+(function () {
+
+"use strict";
+// ---------------------------------------------------------------- Daten der Auslegung
+const DESIGN = window.DESIGN || {};
+const PARTS = [
+  ["Tageslichtprojektor", "Halogenlampe (250–400 W) mit Lüfter und Fresnel-Glasplatte 28,5 × 28,5 cm. Die Platte wird heiß, deshalb steht das Gefäß nicht direkt darauf."],
+  ["Zusatz-Fresnellinse", "Schwache Fresnellinse (f ≈ 1 m, ~30 × 30 cm) auf der Glasplatte. Sie bündelt den Lichtkegel so, dass er in den tiefer sitzenden Kurzbrennweiten-Kopf trifft; der genaue Wert hängt vom Projektor ab."],
+  ["Rahmen mit 2 cm Luftspalt", "Alu-Profile auf dem Tisch tragen das gefüllte Gefäß (~30 kg) über der Glasplatte. Der Spalt hält Wärme vom Wasser fern."],
+  ["Glasaquarium, rahmenlos", "Innen ~45 × 50 cm, Boden 6 mm Weißglas, plan geschliffene Oberkante. Nur Glas, denn Benzylbenzoat greift Acryl an. Außen eine abnehmbare schwarze Manschette gegen Streulicht."],
+  ["Magnetrührer + Rührstäbchen", "Außen unter dem vorderen Überstand, außerhalb des Lichtfensters. Treibt die Strömung ohne Kabel durch die Wand."],
+  ["Lochblech, 4–5 cm unter der Grenzfläche", "Edelstahl, Lochabstand ~5–10 mm, matt. Zerhackt die Strömung in ~1-cm-Wirbel; an der Grenzfläche kommen ~1 cm/s an (Emulsion erst ab ~5–6 cm/s)."],
+  ["Wasser 8 cm", "Destilliert. Auf dem Weg nach oben klingen die Wirbel auf das sanfte Maß ab."],
+  ["Ölmischung 12 mm", "Isopropylmyristat mit ~42 Vol-% Benzylbenzoat, Dichte ~965 kg/m³, n ≈ 1,49. Tensid für ~2 mN/m erst im Glas testen."],
+  ["Wellenfänger", "Streifen aus Edelstahlgewebe am Rand auf Höhe der Grenzfläche, verdeckt von der Maske."],
+  ["Glasdeckel mit Dichtung", "6 mm Floatglas, Flachdichtung (FKM oder PTFE, vorher im Öl testen), Glasklemmen. 1–2 mm zur Steigrohr-Ecke geneigt, damit Luft entweicht."],
+  ["Steigrohr ≥ 4 cm", "Ausgleich der Wärmeausdehnung (~0,1 L bei 20 K, ~8 cm Pegel). Unter dem Deckel darf keine Luftblase bleiben."],
+  ["Schwarze Maske", "Rahmen auf dem Deckel, 2–3 cm größer als das Lichtfenster: verdeckt Rührer, Fänger und Kanten, bestimmt aber nicht den Rand (er läge fast in der Fokusebene und würde scharf abgebildet)."],
+  ["Verlaufsfolie", "Overhead-Folie auf der Glasplatte, innen klar, außen über ~3,5 cm dunkler, Ecken rund, Rand leicht wellig. Weit unter der Fokusebene wird sie unscharf abgebildet: weicher Auslauf von ~25 cm an der Decke, Druckraster unsichtbar."],
+  ["Weitwinkel-Projektionskopf", "Brennweite ≈ 17 cm statt ~33 cm, ~19 cm über der Grenzfläche: Vergrößerung ≈ 8,7. Spiegel hochgeklappt oder abgenommen, das Bild geht direkt an die Decke. Der Fokus regelt den Kontrast. Am Rand muss das Objektiv ~45° abdecken; wird es dort unscharf, die Maske etwas enger machen."],
+  ["Decke, 2,5 m", "Lichtfeld ≈ 2,5 × 2,5 m (Projektor auf einem niedrigen Tisch). Zellen an der Decke ≈ 30 cm groß."],
+];
+
+// ---------------------------------------------------------------- Szene
+const stage = document.getElementById("stage");
+const statusEl = document.getElementById("status");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0f13);
+scene.fog = new THREE.Fog(0x0a0f13, 9, 16);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 60);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// Maße (m): Tisch 42 cm, Projektor 13 cm hoch, Rahmen mit 2 cm Luftspalt, Gefäß innen 45 x 50 cm
+const Y_TABLE = 0.42, Y_STAGE = 0.552, T_GLASS = 0.006, H1 = 0.080, H2 = 0.012;
+const Y_VB = Y_STAGE + 0.020;                 // Unterkante Gefäßboden
+const Y_IF = Y_VB + T_GLASS + H1;             // ruhende Grenzfläche
+const Y_LID = Y_IF + H2, Y_TOP = Y_LID + T_GLASS;
+const Y_HEAD = Y_IF + 0.19, Y_CEIL = 2.5;      // Weitwinkel-Kopf f ≈ 17 cm, ~19 cm über der Grenzfläche
+const IX = 0.45, IZ = 0.50, ZC = 0.05;        // Innenmaß, Versatz nach vorn (Platz für den Rührer)
+const APER = 0.285, FIELD = 2.5;              // Lichtfenster der Glasplatte, Lichtfeld an der Decke (Vergrößerung ≈ 8,7)
+
+scene.add(new THREE.AmbientLight(0x6d8590, 0.55));
+const key = new THREE.DirectionalLight(0xffffff, 0.9);
+key.position.set(2.5, 5, 3);
+scene.add(key);
+const ledLight = new THREE.PointLight(0xffe7c2, 1.2, 3, 2);
+ledLight.position.set(0, Y_TABLE + 0.06, 0);
+scene.add(ledLight);
+
+const mat = (c, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.8, metalness: 0.05 }, o));
+function box(w, h, d, m, x, y, z) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+  b.position.set(x, y, z);
+  scene.add(b);
+  return b;
+}
+function edges(mesh, color = 0x3d5561) {
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color }));
+  e.position.copy(mesh.position);
+  scene.add(e);
+  return e;
+}
+
+// Raum
+box(9, 0.02, 9, mat(0x141b20, { transparent: true, opacity: 0.18, depthWrite: false }), 0, -0.01, 0);   // Boden durchsichtig
+box(9, 4, 0.05, mat(0x10161a), 0, 2, -3.2);
+box(0.05, 4, 9, mat(0x0f1519), -3.4, 2, 0);
+const ceilBase = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), mat(0x161e23, { side: THREE.DoubleSide }));
+ceilBase.rotation.x = Math.PI / 2;
+ceilBase.position.y = Y_CEIL + 0.002;
+scene.add(ceilBase);
+// niedriger Tisch
+box(0.8, 0.03, 0.7, mat(0x2a2420, { roughness: 0.6 }), 0, Y_TABLE - 0.015, 0.03);
+[[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([sx, sz]) => box(0.035, Y_TABLE - 0.03, 0.035, mat(0x2a2420), sx * 0.37, (Y_TABLE - 0.03) / 2, 0.03 + sz * 0.32));
+
+// Tageslichtprojektor: Gehäuse halbtransparent, Halogenlampe, Fresnel-Glasplatte, Säule mit Kopf
+const PW = 0.40, PD = 0.42;
+const body = box(PW, Y_STAGE - Y_TABLE, PD, mat(0x8d9599, { transparent: true, opacity: 0.35, metalness: 0.3, roughness: 0.5 }), 0, (Y_STAGE + Y_TABLE) / 2, 0);
+edges(body, 0x9fb3bb);
+const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.012, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff1d6 }));
+bulb.position.set(0, Y_TABLE + 0.05, 0);
+scene.add(bulb);
+box(0.06, 0.01, 0.06, mat(0x777f84, { metalness: 0.6 }), 0, Y_TABLE + 0.035, 0);
+for (let i = 0; i < 6; i++) box(0.004, 0.06, 0.012, mat(0x2b3439), PW / 2 + 0.002, Y_TABLE + 0.065, -0.07 + i * 0.028);   // Lüftungsschlitze
+function ringTexture(n = 512, rings = 46) {
+  const c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d");
+  g.fillStyle = "#cfe9ef"; g.fillRect(0, 0, n, n);
+  g.strokeStyle = "rgba(40,80,95,0.55)"; g.lineWidth = 1.2;
+  for (let i = 1; i < rings; i++) { g.beginPath(); g.arc(n / 2, n / 2, (i / rings) * n * 0.72, 0, 7); g.stroke(); }
+  return new THREE.CanvasTexture(c);
+}
+const fresnel = box(APER, 0.003, APER, new THREE.MeshStandardMaterial({ map: ringTexture(), transparent: true, opacity: 0.6, roughness: 0.3 }), 0, Y_STAGE + 0.0015, 0);
+// Zusatz-Fresnellinse (f ≈ 1 m) direkt auf der Glasplatte: bündelt das Licht in den tiefer sitzenden Kopf
+const fresnel2 = box(APER + 0.01, 0.002, APER + 0.01, new THREE.MeshStandardMaterial({ map: ringTexture(512, 30), transparent: true, opacity: 0.45, roughness: 0.3, color: 0xd8f3f8 }), 0, Y_STAGE + 0.006, 0);
+const metalM = mat(0x3a464c, { metalness: 0.5 });
+box(0.03, Y_HEAD - Y_STAGE + 0.02, 0.03, metalM, 0, (Y_HEAD + Y_STAGE) / 2 + 0.01, -PD / 2 - 0.03);    // Säule
+box(0.025, 0.025, PD / 2 + 0.03, metalM, 0, Y_HEAD + 0.035, -(PD / 2 + 0.03) / 2);                    // Ausleger
+const head = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.07, 0.07, 32), mat(0x1c2428, { metalness: 0.6, roughness: 0.35 }));
+head.position.set(0, Y_HEAD, 0);
+scene.add(head);
+const lens = new THREE.Mesh(new THREE.CircleGeometry(0.058, 32), new THREE.MeshStandardMaterial({ color: 0x9fd8e8, metalness: 0.9, roughness: 0.05, emissive: 0x16323a }));
+lens.rotation.x = -Math.PI / 2;
+lens.position.set(0, Y_HEAD + 0.036, 0);
+scene.add(lens);
+// Spiegel hochgeklappt (hinten am Kopf, fast senkrecht)
+const mirror = box(0.11, 0.11, 0.004, new THREE.MeshStandardMaterial({ color: 0xaecdd6, metalness: 0.95, roughness: 0.08 }), 0, Y_HEAD + 0.1, -0.065);
+mirror.rotation.x = -0.12;
+
+// Lichtbündel
+function frustum(rTop, rBot, yTop, yBot, color, opacity, square = true) {
+  const g = new THREE.CylinderGeometry(rTop, rBot, yTop - yBot, square ? 4 : 32, 1, true);
+  if (square) g.rotateY(Math.PI / 4);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+  m.position.y = (yTop + yBot) / 2;
+  scene.add(m);
+  return m;
+}
+const D2 = Math.SQRT2 / 2;
+frustum(APER / 2 / D2, 0.006, Y_STAGE, Y_TABLE + 0.05, 0xffe7c2, 0.06);
+
+// Verlaufsfolie: innen klar, außen über ~3,5 cm dunkler, abgerundet und leicht wellig
+function edgeShape(qx, qy) {             // qx, qy: Lage relativ zur halben Fensterbreite
+  const d = Math.pow(Math.pow(Math.abs(qx), 4) + Math.pow(Math.abs(qy), 4), 0.25), th = Math.atan2(qy, qx);
+  return d * (1 + 0.025 * Math.sin(5 * th + 1.3) + 0.018 * Math.sin(11 * th + 0.4) + 0.012 * Math.sin(17 * th + 2.1));
+}
+function filmTexture(n = 256) {
+  const c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d"), img = g.createImageData(n, n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const d = edgeShape((i + 0.5) / n * 2 - 1, (j + 0.5) / n * 2 - 1);
+    const t = Math.min(1, Math.max(0, (d - 0.76) / 0.24)), a = t * t * (3 - 2 * t);
+    const o = (j * n + i) * 4;
+    img.data[o] = img.data[o + 1] = img.data[o + 2] = 12; img.data[o + 3] = Math.round(235 * a);
+  }
+  g.putImageData(img, 0, 0);
+  return new THREE.CanvasTexture(c);
+}
+const film = box(APER, 0.0006, APER, new THREE.MeshBasicMaterial({ map: filmTexture(), transparent: true, depthWrite: false }), 0, Y_STAGE + 0.0075, 0);
+
+// Rahmen: vier Beine und Auflageleisten um den Projektor herum
+const alu = mat(0xb9c2c6, { metalness: 0.7, roughness: 0.35 });
+const OX = IX + 2 * T_GLASS, OZ = IZ + 2 * T_GLASS;
+[[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([sx, sz]) => box(0.02, Y_VB - Y_TABLE, 0.02, alu, sx * (OX / 2 - 0.01), (Y_VB + Y_TABLE) / 2, ZC + sz * (OZ / 2 - 0.01)));
+box(OX, 0.012, 0.02, alu, 0, Y_VB - 0.006, ZC + OZ / 2 - 0.01);
+box(OX, 0.012, 0.02, alu, 0, Y_VB - 0.006, ZC - OZ / 2 + 0.01);
+box(0.02, 0.012, OZ, alu, OX / 2 - 0.01, Y_VB - 0.006, ZC);
+box(0.02, 0.012, OZ, alu, -OX / 2 + 0.01, Y_VB - 0.006, ZC);
+
+// Gefäß: Glasboden, Wände mit abnehmbarer schwarzer Manschette
+const glassM = new THREE.MeshStandardMaterial({ color: 0xbfe7f0, transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.1, depthWrite: false });
+box(OX, T_GLASS, OZ, glassM, 0, Y_VB + T_GLASS / 2, ZC);
+const sleeveM = new THREE.MeshStandardMaterial({ color: 0x050708, transparent: true, opacity: 0.4, roughness: 0.95, depthWrite: false });
+const WH = Y_LID - Y_VB;
+box(OX, WH, T_GLASS, sleeveM, 0, Y_VB + WH / 2, ZC + OZ / 2 - T_GLASS / 2);
+box(OX, WH, T_GLASS, sleeveM, 0, Y_VB + WH / 2, ZC - OZ / 2 + T_GLASS / 2);
+box(T_GLASS, WH, OZ, sleeveM, OX / 2 - T_GLASS / 2, Y_VB + WH / 2, ZC);
+box(T_GLASS, WH, OZ, sleeveM, -OX / 2 + T_GLASS / 2, Y_VB + WH / 2, ZC);
+const shell = box(OX, Y_TOP - Y_VB, OZ, new THREE.MeshBasicMaterial({ visible: false }), 0, (Y_VB + Y_TOP) / 2, ZC);
+edges(shell, 0x7fb8c4);
+// Wasser und Öl als Volumen
+box(IX, H1 - 0.0005, IZ, new THREE.MeshStandardMaterial({ color: 0x3f8fb0, transparent: true, opacity: 0.30, depthWrite: false, roughness: 0.2 }), 0, Y_VB + T_GLASS + (H1 - 0.0005) / 2, ZC);
+box(IX, H2 - 0.0005, IZ, new THREE.MeshStandardMaterial({ color: 0xe2b866, transparent: true, opacity: 0.30, depthWrite: false, roughness: 0.2 }), 0, Y_IF + 0.0005 + (H2 - 0.0005) / 2, ZC);
+// Lochblech 4,5 cm unter der Grenzfläche, auf vier Abstandshaltern
+function holeTexture(n = 512, pitch = 16) {
+  const c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d");
+  g.fillStyle = "#9aa6ab"; g.fillRect(0, 0, n, n);
+  g.globalCompositeOperation = "destination-out";
+  for (let y = pitch / 2, r = 0; y < n; y += pitch, r++) for (let x = r % 2 ? pitch : pitch / 2; x < n; x += pitch) { g.beginPath(); g.arc(x, y, pitch * 0.33, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3);
+  return t;
+}
+const Y_SIEVE = Y_IF - 0.045;
+box(IX - 0.004, 0.0015, IZ - 0.004, new THREE.MeshStandardMaterial({ map: holeTexture(), transparent: true, opacity: 0.85, metalness: 0.6, roughness: 0.45, side: THREE.DoubleSide, depthWrite: false }), 0, Y_SIEVE, ZC);
+[[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([sx, sz]) => box(0.008, Y_SIEVE - Y_VB - T_GLASS, 0.008, alu, sx * (IX / 2 - 0.02), (Y_SIEVE + Y_VB + T_GLASS) / 2, ZC + sz * (IZ / 2 - 0.02)));
+// Magnetrührer unter dem vorderen Überstand (außerhalb des Lichtfensters), Rührstäbchen im Gefäß
+const SX = 0.12, SZ = ZC + IZ / 2 - 0.06;
+box(0.12, Y_VB - Y_TABLE - 0.06, 0.09, mat(0x2b3439), SX, Y_TABLE + (Y_VB - Y_TABLE - 0.06) / 2, SZ);     // Unterbau
+box(0.12, 0.06, 0.1, mat(0xdfe5e8, { roughness: 0.5 }), SX, Y_VB - 0.03, SZ);
+box(0.02, 0.006, 0.004, mat(0x3a6ea5), SX + 0.035, Y_VB - 0.03, SZ + 0.052);
+const stirBar = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.048, 12), mat(0xf2f4f5, { roughness: 0.3 }));
+stirBar.rotation.z = Math.PI / 2;
+const stirGroup = new THREE.Group();
+stirGroup.add(stirBar);
+stirGroup.position.set(SX, Y_VB + T_GLASS + 0.005, SZ);
+scene.add(stirGroup);
+// Wellenfänger am Rand (Gewebestreifen auf Höhe der Grenzfläche)
+const fM = mat(0x5e6c73, { roughness: 0.9, transparent: true, opacity: 0.8 });
+const WF = 0.03;
+box(IX, 0.01, WF, fM, 0, Y_IF, ZC + IZ / 2 - WF / 2);
+box(IX, 0.01, WF, fM, 0, Y_IF, ZC - IZ / 2 + WF / 2);
+box(WF, 0.01, IZ, fM, IX / 2 - WF / 2, Y_IF, ZC);
+box(WF, 0.01, IZ, fM, -IX / 2 + WF / 2, Y_IF, ZC);
+// Glasdeckel, Klemmen, schwarze Maske um das Lichtfenster, Steigrohr
+box(OX + 0.02, T_GLASS, OZ + 0.02, glassM, 0, Y_LID + T_GLASS / 2, ZC);
+const clampM = mat(0x9aa6ab, { metalness: 0.6, roughness: 0.4 });
+[[-0.12, 1], [0.12, 1], [-0.12, -1], [0.12, -1]].forEach(([x, sz]) => box(0.03, 0.03, 0.025, clampM, x, Y_LID, ZC + sz * (OZ / 2 + 0.008)));
+[[1, -0.12], [1, 0.14], [-1, -0.12], [-1, 0.14]].forEach(([sx, dz]) => box(0.025, 0.03, 0.03, clampM, sx * (OX / 2 + 0.008), Y_LID, ZC + dz));
+const maskM = mat(0x07090a, { roughness: 0.95 });
+const LX = (OX + 0.02) / 2, LZ0 = ZC - (OZ + 0.02) / 2, LZ1 = ZC + (OZ + 0.02) / 2, A2 = APER / 2;
+box(2 * LX, 0.002, LZ1 - A2, maskM, 0, Y_TOP + 0.001, (LZ1 + A2) / 2);
+box(2 * LX, 0.002, -A2 - LZ0, maskM, 0, Y_TOP + 0.001, (LZ0 - A2) / 2);
+box(LX - A2, 0.002, APER, maskM, (LX + A2) / 2, Y_TOP + 0.001, 0);
+box(LX - A2, 0.002, APER, maskM, -(LX + A2) / 2, Y_TOP + 0.001, 0);
+const PX = -IX / 2 + 0.04, PZ = ZC + IZ / 2 - 0.04;
+const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.13, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0xbfe7f0, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }));
+pipe.position.set(PX, Y_TOP + 0.065, PZ); scene.add(pipe);
+const pipeOil = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.05, 32), new THREE.MeshStandardMaterial({ color: 0xe2b866, transparent: true, opacity: 0.55, depthWrite: false }));
+pipeOil.position.set(PX, Y_TOP + 0.025, PZ); scene.add(pipeOil);
+
+// Lichtwege: Gefäß -> Kopf (konvergent), Kopf -> Decke (divergent)
+frustum(0.045, APER / 2 / D2, Y_HEAD - 0.035, Y_TOP + 0.002, 0x8fe6ee, 0.06);
+frustum(FIELD / 2 / D2, 0.045, Y_CEIL - 0.004, Y_HEAD + 0.035, 0x8fe6ee, 0.03);
+
+// ---------------------------------------------------------------- Grenzfläche (Höhenfeld)
+let HF = 96, hfData = null, hfScale = 2e-4, nFrames = 120, fps = 20;
+const ifGeo = new THREE.BufferGeometry();
+const ifMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.95, side: THREE.DoubleSide, emissive: 0x000000 });
+const ifMesh = new THREE.Mesh(ifGeo, ifMat);
+ifMesh.frustumCulled = false;   // Höhenfeld wird erst nach dem Laden gefüllt und bewegt sich
+let lensColors = true;
+scene.add(ifMesh);
+function buildInterface() {
+  const pos = new Float32Array(HF * HF * 3), idx = [];
+  for (let i = 0; i < HF; i++) for (let k = 0; k < HF; k++) {
+    const p = (i * HF + k) * 3;
+    pos[p] = (i / (HF - 1) - 0.5) * APER;
+    pos[p + 1] = Y_IF;
+    pos[p + 2] = (k / (HF - 1) - 0.5) * APER;
+  }
+  for (let i = 0; i < HF - 1; i++) for (let k = 0; k < HF - 1; k++) {
+    const a = i * HF + k, b = a + 1, c = a + HF, d = c + 1;
+    idx.push(a, b, c, b, d, c);
+  }
+  ifGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  ifGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(HF * HF * 3), 3));
+  ifGeo.setIndex(idx);
+}
+function updateInterface(fr, exag) {
+  const f0 = Math.floor(fr) % nFrames, f1 = (f0 + 1) % nFrames, w = fr - Math.floor(fr);
+  const pos = ifGeo.attributes.position.array, N = HF * HF, o0 = f0 * N, o1 = f1 * N;
+  const s = hfScale / 127 * exag;
+  for (let n = 0; n < N; n++) {
+    const h = ((hfData[o0 + n] - 128) * (1 - w) + (hfData[o1 + n] - 128) * w) * s;
+    pos[n * 3 + 1] = Y_IF + h;
+  }
+  ifGeo.attributes.position.needsUpdate = true;
+  ifGeo.computeVertexNormals();
+  // Linsenwirkung: Krümmung (−Laplace der Höhe). Bündelnde Stellen hell, zerstreuende dunkel.
+  const col = ifGeo.attributes.color.array, Y = n => pos[n * 3 + 1];
+  let s2 = 0;
+  const lap = new Float32Array(N);
+  for (let i = 1; i < HF - 1; i++) for (let k = 1; k < HF - 1; k++) {
+    const n = i * HF + k;
+    lap[n] = Y(n - HF) + Y(n + HF) + Y(n - 1) + Y(n + 1) - 4 * Y(n);
+    s2 += lap[n] * lap[n];
+  }
+  const sd = Math.sqrt(s2 / N) || 1;
+  for (let n = 0; n < N; n++) {
+    let r = 0.62, g = 0.86, b = 0.91;
+    if (lensColors) {
+      const v = Math.max(-1, Math.min(1, -lap[n] / sd / 2.2));
+      if (v > 0) { r = 0.30 + 0.70 * v; g = 0.62 + 0.38 * v; b = 0.70 + 0.30 * v; }
+      else { r = 0.30 + 0.25 * v; g = 0.62 + 0.40 * v; b = 0.70 + 0.35 * v; }
+    }
+    col[n * 3] = r; col[n * 3 + 1] = g; col[n * 3 + 2] = b;
+  }
+  ifGeo.attributes.color.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- Decke (Atlas-Animation)
+const ceilMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const CROP = 1.08;   // Atlas zeigt 108 % des Lichtfelds (Rand sichtbar)
+const ceil = new THREE.Mesh(new THREE.PlaneGeometry(FIELD * CROP, FIELD * CROP), ceilMat);
+ceil.rotation.x = Math.PI / 2;
+ceil.position.y = Y_CEIL - 0.001;
+scene.add(ceil);
+// Weicher Rand: Helligkeit läuft über den äußeren Bereich aus (gleiche Form wie die Folie,
+// in der Unschärfe der Abbildung). Das Bild wird dafür ~15 % größer projiziert.
+const edgeU = { uSoft: { value: 1 }, uHalf: { value: FIELD / 2 } };
+ceilMat.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, edgeU);
+  sh.vertexShader = "varying vec2 vPosL;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vPosL = position.xy;");
+  sh.fragmentShader = `uniform float uSoft; uniform float uHalf; varying vec2 vPosL;
+float edgeF(vec2 p) {
+  vec2 q = abs(p) / uHalf;
+  float d = pow(pow(q.x, 4.0) + pow(q.y, 4.0), 0.25), th = atan(p.y, p.x);
+  d *= 1.0 + 0.025 * sin(5.0 * th + 1.3) + 0.018 * sin(11.0 * th + 0.4) + 0.012 * sin(17.0 * th + 2.1);
+  return 1.0 - smoothstep(0.80, 1.02, d);
+}
+` + sh.fragmentShader.replace("#include <tonemapping_fragment>", "  gl_FragColor.rgb *= mix(1.0, edgeF(vPosL), uSoft);\n#include <tonemapping_fragment>");
+};
+let softEdge = true;
+function setEdge(soft) {
+  softEdge = soft;
+  edgeU.uSoft.value = soft ? 1 : 0;
+  const k = soft ? 1.15 : 1;
+  ceil.scale.set(k, k, 1);
+  film.visible = soft;
+  document.querySelectorAll("#edge button").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.edge === "soft") === soft)));
+}
+const tex = { lamp: null, pool: null };
+let grid = 11, src = "lamp";
+function setFrameTex(fr) {
+  const t = tex[src];
+  if (!t) return;
+  const f = Math.floor(fr) % nFrames, r = Math.floor(f / grid), c = f % grid;
+  t.offset.set(c / grid, 1 - (r + 1) / grid);
+}
+
+// ---------------------------------------------------------------- Beschriftungen
+const LABELS = [
+  ["Halogenlampe + Lüfter", () => new THREE.Vector3(0, Y_TABLE + 0.05, PD / 2)],
+  ["Fresnel-Glasplatte 28,5 cm", () => new THREE.Vector3(APER / 2, Y_STAGE, -APER / 2 + 0.02)],
+  ["Zusatz-Fresnellinse f ≈ 1 m", () => new THREE.Vector3(-APER / 2, Y_STAGE + 0.006, -APER / 2 + 0.03)],
+  ["Verlaufsfolie", () => new THREE.Vector3(APER / 2 - 0.01, Y_STAGE + 0.008, APER / 2 - 0.02), "soft"],
+  ["Rahmen, 2 cm Luftspalt", () => new THREE.Vector3(-OX / 2 + 0.01, Y_VB - 0.03, ZC + OZ / 2 - 0.01)],
+  ["Wasser 8 cm", () => new THREE.Vector3(-IX / 2, Y_VB + 0.03, ZC + 0.1)],
+  ["Lochblech", () => new THREE.Vector3(IX / 2 - 0.05, Y_SIEVE, ZC - 0.15)],
+  ["Ölmischung 12 mm", () => new THREE.Vector3(IX / 2, Y_LID - 0.004, ZC + 0.12)],
+  ["Magnetrührer", () => new THREE.Vector3(SX + 0.06, Y_VB - 0.05, SZ + 0.05)],
+  ["Rührstäbchen", () => new THREE.Vector3(SX, Y_VB + 0.02, SZ)],
+  ["Wellenfänger", () => new THREE.Vector3(IX / 2 - 0.015, Y_IF + 0.006, ZC - 0.1)],
+  ["Glasdeckel + Klemmen", () => new THREE.Vector3(0.12, Y_TOP + 0.03, ZC + OZ / 2 + 0.01)],
+  ["Steigrohr", () => new THREE.Vector3(PX, Y_TOP + 0.14, PZ)],
+  ["Schwarze Maske", () => new THREE.Vector3(-(APER / 2 + 0.04), Y_TOP + 0.002, -0.05)],
+  ["Weitwinkel-Kopf f ≈ 17 cm, Spiegel hochgeklappt", () => new THREE.Vector3(0, Y_HEAD + 0.17, -0.06)],
+  ["Lichtfeld ≈ 2,5 × 2,5 m", () => new THREE.Vector3(FIELD / 2, Y_CEIL - 0.05, FIELD / 2)],
+  ["weicher Auslauf ~25 cm", () => new THREE.Vector3(-FIELD * 0.55, Y_CEIL - 0.05, 0), "soft"],
+];
+const labelBox = document.getElementById("labels");
+const SVGNS = "http://www.w3.org/2000/svg";
+const leaders = document.createElementNS(SVGNS, "svg"); leaders.setAttribute("class", "leaders");
+const leadPath = document.createElementNS(SVGNS, "path"), dotPath = document.createElementNS(SVGNS, "path");
+dotPath.setAttribute("class", "dot"); leaders.append(leadPath, dotPath); labelBox.appendChild(leaders);
+const labelEls = LABELS.map(([t]) => { const d = document.createElement("div"); d.className = "lbl"; d.textContent = t; labelBox.appendChild(d); return d; });
+let labelW = null;
+let showLabels = false;
+const tmpV = new THREE.Vector3();
+function placeLabels() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (!labelW) labelW = labelEls.map(el => el.offsetWidth || 120);
+  tmpV.copy(controls.target).project(camera);
+  const cx = (tmpV.x + 1) / 2 * w;
+  const items = [];
+  LABELS.forEach(([, p], i) => {
+    tmpV.copy(p()).project(camera);
+    const ax = (tmpV.x + 1) / 2 * w, ay = (1 - tmpV.y) / 2 * h;
+    const vis = showLabels && tmpV.z < 1 && ax > 0 && ax < w && ay > 0 && ay < h && (LABELS[i][2] !== "soft" || softEdge);
+    labelEls[i].classList.toggle("hidden-lbl", !vis);
+    if (vis) items.push({ i, ax, ay, side: ax < cx ? -1 : 1 });
+  });
+  let d = "", dots = "";
+  for (const side of [-1, 1]) {
+    const col = items.filter(it => it.side === side).sort((a, b) => a.ay - b.ay);
+    if (!col.length) continue;
+    const wMax = Math.max(...col.map(it => labelW[it.i]));
+    // Spalte: deutlich neben den äußersten Ankern, aber im Bild
+    const edge = side < 0 ? Math.min(...col.map(it => it.ax)) - 48 : Math.max(...col.map(it => it.ax)) + 48;
+    const x = side < 0 ? Math.max(wMax + 12, edge) : Math.min(w - wMax - 12, edge);
+    const top = (document.querySelector(".head").offsetHeight || 80) + 26, bottom = h - 34, gap = 17;
+    let y = top - gap;
+    for (const it of col) { it.y = Math.max(it.ay, y + gap); y = it.y; }
+    const over = y - bottom;
+    if (over > 0) for (const it of col) it.y = Math.max(top, it.y - over);
+    for (let k = 1; k < col.length; k++) col[k].y = Math.max(col[k].y, col[k - 1].y + gap);
+    for (const it of col) {
+      const el = labelEls[it.i];
+      el.style.left = (side < 0 ? x - labelW[it.i] : x) + "px";
+      el.style.top = it.y + "px";
+      const lx = side < 0 ? x + 4 : x - 4;
+      d += `M${it.ax.toFixed(1)} ${it.ay.toFixed(1)}L${lx.toFixed(1)} ${it.y.toFixed(1)}`;
+      dots += `M${(it.ax - 1.8).toFixed(1)} ${it.ay.toFixed(1)}a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0`;
+    }
+  }
+  leadPath.setAttribute("d", d); dotPath.setAttribute("d", dots);
+}
+
+// ---------------------------------------------------------------- Ansichten
+const VIEWS = {
+  room: { pos: [2.9, 1.5, 3.4], tgt: [0, 1.35, 0] },
+  lamp: { pos: [0.85, 0.95, 1.05], tgt: [0, 0.7, 0.03] },
+  tank: { pos: [0.3, Y_IF + 0.2, 0.5], tgt: [0, Y_IF - 0.02, 0.03] },
+  ceiling: { pos: [0.7, 0.05, 2.7], tgt: [0, Y_CEIL, 0] },
+};
+let tween = null;
+function goView(name) {
+  const v = VIEWS[name];
+  tween = { t: 0, p0: camera.position.clone(), q0: controls.target.clone(), p1: new THREE.Vector3(...v.pos), q1: new THREE.Vector3(...v.tgt) };
+  document.querySelectorAll("#views button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
+}
+camera.position.set(...VIEWS.room.pos);
+controls.target.set(...VIEWS.room.tgt);
+
+// ---------------------------------------------------------------- Bedienung
+const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let playing = !reduced, speed = 1, exag = 8, simT = 0;
+const playBtn = document.getElementById("play");
+function setPlay(p) { playing = p; playBtn.setAttribute("aria-pressed", String(p)); playBtn.textContent = p ? "Läuft" : "Pausiert"; }
+setPlay(playing);
+playBtn.addEventListener("click", () => setPlay(!playing));
+document.querySelectorAll("#speed [data-speed]").forEach(b => b.addEventListener("click", () => {
+  speed = parseFloat(b.dataset.speed);
+  document.querySelectorAll("#speed [data-speed]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+}));
+document.querySelectorAll("#views button").forEach(b => b.addEventListener("click", () => goView(b.dataset.view)));
+document.querySelectorAll("#edge button").forEach(b => b.addEventListener("click", () => setEdge(b.dataset.edge === "soft")));
+setEdge(true);
+document.querySelectorAll("#source button").forEach(b => b.addEventListener("click", () => {
+  src = b.dataset.src;
+  ceilMat.map = tex[src]; ceilMat.needsUpdate = true;
+  document.querySelectorAll("#source button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+}));
+const exagEl = document.getElementById("exag"), exagVal = document.getElementById("exagVal");
+exagEl.addEventListener("input", () => { exag = +exagEl.value; exagVal.textContent = "×" + exag; });
+document.getElementById("lbls").addEventListener("change", e => { showLabels = e.target.checked; leaders.style.display = showLabels ? "" : "none"; });
+document.getElementById("lensc").addEventListener("change", e => { lensColors = e.target.checked; });
+
+// Teile-Liste
+const partsEl = document.getElementById("parts");
+PARTS.forEach(([t, d], i) => {
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="n">${i + 1}</span><b></b><p></p>`;
+  li.querySelector("b").textContent = t; li.querySelector("p").textContent = d;
+  partsEl.appendChild(li);
+});
+
+function fillSpec(meta) {
+  const nice = { mischung: `IPM + Benzylbenzoat (ρ ${Math.round(meta.rho2)} kg/m³)`, ipm: "Isopropylmyristat", pdms2: "PDMS 2 cSt", pdms5: "PDMS 5 cSt", methylsalicylat: "Methylsalicylat", limonen: "Limonen", pcymol: "p-Cymol", benzylbenzoat: "Benzylbenzoat", ethyloleat: "Ethyloleat" };
+  const rows = [
+    ["Öl", nice[meta.fluid] || meta.fluid],
+    ["Grenzflächenspannung", (meta.sigma * 1e3).toFixed(1) + " mN/m"],
+    ["Hauptwellenlänge", (meta.lam * 100).toFixed(1) + " cm"],
+    ["Wassertiefe", meta.h1 ? (meta.h1 * 100).toFixed(0) + " cm" : "–"],
+    meta.drive ? ["Antrieb", meta.drive] : ["Anregungsbandbreite", meta.bandwidth.toFixed(2)],
+    ["Wellenfrequenz", meta.f_wave.toFixed(2) + " Hz"],
+    ["Wellenhöhe (rms)", (meta.a_rms * 1e3).toFixed(2) + " mm"],
+    ["Steilheit (rms)", meta.slope_rms.toFixed(3)],
+    ["Brechzahlen", meta.n1.toFixed(3) + " / " + meta.n2.toFixed(3)],
+  ];
+  const dl = document.getElementById("spec");
+  rows.forEach(([k, v]) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); });
+  const tb = document.querySelector("#kpi tbody");
+  (DESIGN.kpi || []).forEach(([k, a, b, ok]) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td></td><td></td><td></td>";
+    tr.children[0].textContent = k; tr.children[1].textContent = a; tr.children[2].textContent = b;
+    if (ok) tr.children[2].className = "ok";
+    tb.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------- Laden
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", () => { resize(); labelW = null; });
+resize();
+
+const loader = new THREE.TextureLoader();
+function loadTex(url) {
+  return new Promise((res, rej) => loader.load(url, t => {
+    t.encoding = THREE.sRGBEncoding;
+    t.repeat.set(1 / grid, 1 / grid);
+    res(t);
+  }, undefined, rej));
+}
+function loadHeights(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const rgba = g.getImageData(0, 0, c.width, c.height).data;
+      const out = new Uint8Array(rgba.length / 4);
+      for (let i = 0; i < out.length; i++) out[i] = rgba[i * 4];
+      res(out);
+    };
+    img.onerror = () => rej(new Error("Höhenfeld fehlt"));
+    img.src = url;
+  });
+}
+Promise.all([fetch("meta.json").then(r => r.json()), loadHeights("interface.png")])
+  .then(([meta, data]) => {
+    HF = meta.hf; nFrames = meta.frames; fps = meta.fps; grid = meta.grid; hfScale = meta.hf_scale_m;
+    hfData = data;
+    buildInterface();
+    fillSpec(meta);
+    return Promise.all([loadTex("ceiling_lamp.jpg"), loadTex("ceiling_pool.jpg")]);
+  })
+  .then(([a, b]) => {
+    tex.lamp = a; tex.pool = b;
+    ceilMat.map = tex.lamp; ceilMat.needsUpdate = true;
+    statusEl.hidden = true;
+  })
+  .catch(err => { statusEl.textContent = "Simulationsdaten konnten nicht geladen werden (" + err.message + ")."; });
+
+// ---------------------------------------------------------------- Schleife
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  if (protoPane.hidden) { requestAnimationFrame(loop); return; }
+  if (playing) simT += dt * speed;
+  const fr = simT * fps;
+  if (hfData) updateInterface(fr, exag);
+  if (playing) stirGroup.rotation.y += dt * speed * 9;
+  setFrameTex(fr);
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 1.2);
+    const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
+    camera.position.lerpVectors(tween.p0, tween.p1, e);
+    controls.target.lerpVectors(tween.q0, tween.q1, e);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  placeLabels();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+})();
+let physikStarted = false;
+function startPhysik() {
+  if (physikStarted) return;
+  physikStarted = true;
+  (function () {
+
+"use strict";
+// ---------------------------------------------------------------- Physik
+const G = 9.81, RHO1 = 998, NU1 = 1e-6, N1 = 1.333;
+const coth = x => x > 18 ? 1 : 1 / Math.tanh(x);
+const isinh2 = x => { if (x > 18) return 0; const s = Math.sinh(x); return 1 / (s * s); };
+function blend(x) { return { rho2: 853 + 265 * x, n2: 1.4325 + 0.1355 * x, nu2: (6.5 + 0.9 * x) * 1e-6 }; }
+function omega2(k, rho2, h1, h2, s) {
+  return Math.max(((RHO1 - rho2) * G * k + s * k * k * k) / (RHO1 * coth(k * h1) + rho2 * coth(k * h2)), 0);
+}
+function gammaK(k, om, rho2, nu2, h1, h2, f) {
+  const c1 = coth(k * h1), c2 = coth(k * h2);
+  const m1 = RHO1 * Math.sqrt(NU1), m2 = rho2 * Math.sqrt(nu2), M = m1 * m2 / (m1 + m2);
+  const E = RHO1 * c1 + rho2 * c2, w2 = Math.sqrt(om / 2);
+  const gi = k * w2 * (c1 + c2) ** 2 * M / (2 * E);
+  const gb = 2 * k * k * (RHO1 * NU1 * c1 + rho2 * nu2 * c2) / E;
+  const gw = k * w2 * (m1 * isinh2(k * h1) + m2 * isinh2(k * h2)) / (2 * E);
+  const gs = w2 * (m1 + m2) * (4 / 0.35) / (8 * E);
+  return f * (gi + gb + gw + gs);
+}
+function waveInfo(lam, rho2, nu2, s, h1 = 0.08, h2 = 0.012, f = 1) {
+  const k = 2 * Math.PI / lam, om = Math.sqrt(omega2(k, rho2, h1, h2, s));
+  const k2 = k * 1.0005, om2 = Math.sqrt(omega2(k2, rho2, h1, h2, s));
+  const cg = (om2 - om) / (k2 - k), g = gammaK(k, om, rho2, nu2, h1, h2, f);
+  return { f: om / 2 / Math.PI, c: om / k, cg, gamma: g, Ld: cg / g };
+}
+const fmt = (v, d = 2) => v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// ---------------------------------------------------------------- Farben (wie die Simulationsvideos)
+const STOPS = [[0, .03, .06, .10], [.35, .10, .30, .42], [.70, .55, .82, .90], [1, 1, 1, 1]];
+const LUT = (() => {
+  const n = 1024, L = new Uint8ClampedArray(n * 3);
+  for (let i = 0; i < n; i++) {
+    const v = Math.pow(i / (n - 1), 0.6);
+    let j = 0; while (j < 2 && v > STOPS[j + 1][0]) j++;
+    const a = STOPS[j], b = STOPS[j + 1], t = (v - a[0]) / (b[0] - a[0]);
+    for (let c = 0; c < 3; c++) L[i * 3 + c] = 255 * (a[c + 1] + t * (b[c + 1] - a[c + 1]));
+  }
+  return L;
+})();
+function lutColor(I, imax = 4) { const i = Math.min(1023, Math.max(0, (I / imax * 1023) | 0)) * 3; return [LUT[i], LUT[i + 1], LUT[i + 2]]; }
+
+// ---------------------------------------------------------------- FFT (radix 2, ohne Normierung)
+function makeFFT(n) {
+  const rev = new Uint32Array(n), lev = Math.log2(n);
+  for (let i = 0; i < n; i++) { let r = 0; for (let b = 0; b < lev; b++) r |= ((i >> b) & 1) << (lev - 1 - b); rev[i] = r; }
+  const cs = new Float64Array(n / 2), sn = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) { cs[i] = Math.cos(2 * Math.PI * i / n); sn[i] = Math.sin(2 * Math.PI * i / n); }
+  const tr = new Float64Array(n), ti = new Float64Array(n);
+  function f1(re, im, inv) {
+    for (let i = 0; i < n; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    const sg = inv ? 1 : -1;
+    for (let size = 2; size <= n; size <<= 1) {
+      const half = size >> 1, step = n / size;
+      for (let i = 0; i < n; i += size) {
+        for (let j = i, k = 0; j < i + half; j++, k += step) {
+          const l = j + half, c = cs[k], s = sg * sn[k];
+          const xr = re[l] * c - im[l] * s, xi = re[l] * s + im[l] * c;
+          re[l] = re[j] - xr; im[l] = im[j] - xi; re[j] += xr; im[j] += xi;
+        }
+      }
+    }
+  }
+  return function fft2(re, im, inv) {
+    for (let r = 0; r < n; r++) {
+      const o = r * n;
+      for (let c = 0; c < n; c++) { tr[c] = re[o + c]; ti[c] = im[o + c]; }
+      f1(tr, ti, inv);
+      for (let c = 0; c < n; c++) { re[o + c] = tr[c]; im[o + c] = ti[c]; }
+    }
+    for (let c = 0; c < n; c++) {
+      for (let r = 0; r < n; r++) { tr[r] = re[r * n + c]; ti[r] = im[r * n + c]; }
+      f1(tr, ti, inv);
+      for (let r = 0; r < n; r++) { re[r * n + c] = tr[r]; im[r * n + c] = ti[r]; }
+    }
+  };
+}
+let _g2 = null;
+function gauss() {
+  if (_g2 !== null) { const v = _g2; _g2 = null; return v; }
+  let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+  const r = Math.sqrt(-2 * Math.log(u)); _g2 = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+}
+
+// ---------------------------------------------------------------- Kaustik-Maschine
+const DT = 1 / 30;
+class Caustic {
+  constructor(canvas, params, meter) {
+    this.cv = canvas; this.ctx = canvas.getContext("2d");
+    this.N = 128; this.M = 256; this.R = 256; this.Lp = 0.25;
+    this.meter = meter || null;
+    const N = this.N, NN = N * N;
+    this.fft = makeFFT(N);
+    this.kx = new Float64Array(NN); this.ky = new Float64Array(NN); this.K = new Float64Array(NN);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const a = 2 * Math.PI * (i < N / 2 ? i : i - N) / this.Lp, b = 2 * Math.PI * (j < N / 2 ? j : j - N) / this.Lp;
+      const q = i * N + j; this.kx[q] = a; this.ky[q] = b; this.K[q] = Math.hypot(a, b);
+    }
+    for (const k of ["er", "ei", "vr", "vi", "pr", "pi", "wr", "wi", "w0r", "w0i", "Fk", "ou_a", "ou_b", "ecs", "esw", "gam", "w2", "cc", "ar", "ai", "br", "bi"]) this[k] = new Float64Array(NN);
+    for (let q = 0; q < NN; q++) this.w0r[q] = gauss();
+    this.fft(this.w0r, this.w0i, false);
+    this.U = gauss();
+    this.acc = new Float32Array(this.M * this.M); this.tmp = new Float32Array(this.M * this.M); this.prev = new Float32Array(this.M * this.M);
+    this.jit = new Float32Array(this.R * this.R * 2); for (let i = 0; i < this.jit.length; i++) this.jit[i] = Math.random() - 0.5;
+    this.off = document.createElement("canvas"); this.off.width = this.off.height = this.M;
+    this.octx = this.off.getContext("2d"); this.img = this.octx.createImageData(this.M, this.M);
+    this.hist = []; this.slope = 0; this.visible = false;
+    this.p = Object.assign({ bb: 0.42, sigma: 0.002, ell: 0.012, amp: 0.08, D: 1.2, damp: 1, drive: "turb", h1: 0.08, h2: 0.012, tau: 1.0 }, params);
+    this.setup(true);
+    for (let i = 0; i < 45; i++) this.step();
+    this.render();
+  }
+  set(o) {
+    const oldAmp = this.p.amp; Object.assign(this.p, o);
+    if (o.amp !== undefined && oldAmp > 0) { const r = this.p.amp / oldAmp; for (let q = 0; q < this.pr.length; q++) { this.pr[q] *= r; this.pi[q] *= r; } }
+    if (o.drive !== undefined) this.hist = [];
+    this.setup(false);
+  }
+  setup(init) {
+    const p = this.p, b = blend(p.bb); this.rho2 = b.rho2; this.n2 = b.n2; this.nu2 = b.nu2;
+    const NN = this.N * this.N; let s2 = 0;
+    for (let q = 0; q < NN; q++) {
+      const k = this.K[q];
+      if (q === 0) { this.Fk[q] = 0; this.cc[q] = 0; this.ecs[q] = 1; this.esw[q] = 0; this.w2[q] = 1; this.gam[q] = 0; continue; }
+      const om2 = Math.max(omega2(k, this.rho2, p.h1, p.h2, p.sigma), 1e-6), om = Math.sqrt(om2);
+      const g = gammaK(k, om, this.rho2, this.nu2, p.h1, p.h2, p.damp);
+      this.w2[q] = om2; this.gam[q] = g;
+      this.cc[q] = k / (RHO1 * coth(k * p.h1) + this.rho2 * coth(k * p.h2));
+      const e = Math.exp(-g * DT), d = om2 - g * g;
+      if (d > 1e-9) { const wd = Math.sqrt(d); this.ecs[q] = e * Math.cos(wd * DT); this.esw[q] = e * Math.sin(wd * DT) / wd; }
+      else { const qd = Math.sqrt(Math.max(-d, 1e-12)); this.ecs[q] = e * Math.cosh(qd * DT); this.esw[q] = e * Math.sinh(qd * DT) / qd; }
+      const kl = k * p.ell, sh = kl * kl * Math.exp(-kl * kl);
+      this.Fk[q] = Math.sqrt(sh); s2 += sh;
+      const tau = Math.min(Math.max(p.tau * Math.pow(Math.max(kl, 1e-6), -2 / 3), 0.15), 4 * p.tau);
+      this.ou_a[q] = Math.exp(-DT / tau); this.ou_b[q] = Math.sqrt(1 - this.ou_a[q] ** 2);
+    }
+    const norm = p.amp / Math.sqrt(s2 / NN);
+    for (let q = 0; q < NN; q++) this.Fk[q] *= norm;
+    if (init) for (let q = 0; q < NN; q++) { this.pr[q] = this.Fk[q] * this.w0r[q]; this.pi[q] = this.Fk[q] * this.w0i[q]; }
+  }
+  step() {
+    const N = this.N, NN = N * N, p = this.p;
+    if (p.drive === "turb") {
+      for (let q = 0; q < NN; q++) { this.wr[q] = gauss(); this.wi[q] = 0; }
+      this.fft(this.wr, this.wi, false);
+      for (let q = 0; q < NN; q++) {
+        const a = this.ou_a[q], b = this.ou_b[q] * this.Fk[q];
+        this.pr[q] = a * this.pr[q] + b * this.wr[q]; this.pi[q] = a * this.pi[q] + b * this.wi[q];
+      }
+    } else {
+      // ein gemeinsames Zeitsignal für die ganze Fläche; Faktor 1,8 gleicht die Wellenneigung an die Turbulenz an
+      const a = Math.exp(-DT / p.tau); this.U = a * this.U + Math.sqrt(1 - a * a) * gauss();
+      const u = 1.8 * this.U;
+      for (let q = 0; q < NN; q++) { this.pr[q] = u * this.Fk[q] * this.w0r[q]; this.pi[q] = u * this.Fk[q] * this.w0i[q]; }
+    }
+    for (let q = 1; q < NN; q++) {
+      const w2 = this.w2[q], g = this.gam[q], fr = -this.cc[q] * this.pr[q] / w2, fi = -this.cc[q] * this.pi[q] / w2;
+      const xr = this.er[q] - fr, xi = this.ei[q] - fi, vr = this.vr[q], vi = this.vi[q];
+      const c = this.ecs[q], s = this.esw[q];
+      this.er[q] = c * xr + s * (vr + g * xr) + fr; this.ei[q] = c * xi + s * (vi + g * xi) + fi;
+      this.vr[q] = c * vr - s * (w2 * xr + g * vr); this.vi[q] = c * vi - s * (w2 * xi + g * vi);
+    }
+  }
+  render() {
+    const N = this.N, NN = N * N, M = this.M, R = this.R, p = this.p;
+    // Neigungsfelder: a = eta + i*(i kx eta) -> Re = eta, Im = d eta/dx ; b = i ky eta -> Re = d eta/dy
+    for (let q = 0; q < NN; q++) {
+      const kx = this.kx[q], ky = this.ky[q], er = this.er[q], ei = this.ei[q];
+      this.ar[q] = er - kx * er; this.ai[q] = ei - kx * ei;
+      this.br[q] = -ky * ei; this.bi[q] = ky * er;
+    }
+    this.fft(this.ar, this.ai, true); this.fft(this.br, this.bi, true);
+    const sc = 1 / NN, sx = this.ai, sy = this.br;
+    let s2 = 0; for (let q = 0; q < NN; q++) s2 += (sx[q] * sx[q] + sy[q] * sy[q]) * sc * sc;
+    this.slope = Math.sqrt(s2 / NN);
+    const acc = this.acc; acc.fill(0);
+    const dn = this.n2 - N1, gain = p.D * dn * sc / this.Lp * M, w = (M / R) * (M / R);
+    for (let u = 0; u < R; u++) for (let v = 0; v < R; v++) {
+      const ji = (u * R + v) * 2;
+      const gx = (u + 0.5 + this.jit[ji]) / R * N - 0.5, gy = (v + 0.5 + this.jit[ji + 1]) / R * N - 0.5;
+      let i0 = Math.floor(gx), j0 = Math.floor(gy); const fx = gx - i0, fy = gy - j0;
+      i0 = (i0 + N) % N; j0 = (j0 + N) % N; const i1 = (i0 + 1) % N, j1 = (j0 + 1) % N;
+      const a00 = (1 - fx) * (1 - fy), a10 = fx * (1 - fy), a01 = (1 - fx) * fy, a11 = fx * fy;
+      const ex = a00 * sx[i0 * N + j0] + a10 * sx[i1 * N + j0] + a01 * sx[i0 * N + j1] + a11 * sx[i1 * N + j1];
+      const ey = a00 * sy[i0 * N + j0] + a10 * sy[i1 * N + j0] + a01 * sy[i0 * N + j1] + a11 * sy[i1 * N + j1];
+      let X = (u + 0.5 + this.jit[ji]) / R * M + gain * ex, Y = (v + 0.5 + this.jit[ji + 1]) / R * M + gain * ey;
+      X = ((X % M) + M) % M; Y = ((Y % M) + M) % M;
+      let x0 = Math.floor(X), y0 = Math.floor(Y); const gx2 = X - x0, gy2 = Y - y0;
+      const x1 = (x0 + 1) % M, y1 = (y0 + 1) % M;
+      acc[y0 * M + x0] += w * (1 - gx2) * (1 - gy2); acc[y0 * M + x1] += w * gx2 * (1 - gy2);
+      acc[y1 * M + x0] += w * (1 - gx2) * gy2; acc[y1 * M + x1] += w * gx2 * gy2;
+    }
+    // leichte Unschärfe (Quellgröße), 1-2-1 separiert
+    const t = this.tmp;
+    for (let y = 0; y < M; y++) { const o = y * M; for (let x = 0; x < M; x++) t[o + x] = 0.25 * acc[o + (x + M - 1) % M] + 0.5 * acc[o + x] + 0.25 * acc[o + (x + 1) % M]; }
+    for (let y = 0; y < M; y++) { const ym = ((y + M - 1) % M) * M, yp = ((y + 1) % M) * M, o = y * M; for (let x = 0; x < M; x++) acc[o + x] = 0.25 * t[ym + x] + 0.5 * t[o + x] + 0.25 * t[yp + x]; }
+    const d = this.img.data;
+    for (let i = 0; i < M * M; i++) { const c = Math.min(1023, (acc[i] / 4 * 1023) | 0) * 3; d[i * 4] = LUT[c]; d[i * 4 + 1] = LUT[c + 1]; d[i * 4 + 2] = LUT[c + 2]; d[i * 4 + 3] = 255; }
+    this.octx.putImageData(this.img, 0, 0);
+    const cw = this.cv.width, ch = this.cv.height;
+    this.ctx.imageSmoothingEnabled = true;
+    if (cw === ch) this.ctx.drawImage(this.off, 0, 0, cw, ch);
+    else { const s = Math.max(cw, ch); this.ctx.drawImage(this.off, (cw - s) / 2, (ch - s) / 2, s, s); }
+    if (this.meter) this.measure();
+  }
+  measure() {
+    const M = this.M, h = M / 2, a = this.acc, pv = this.prev, dq = [0, 0, 0, 0];
+    for (let y = 0; y < M; y++) for (let x = 0; x < M; x++) { const i = y * M + x; dq[(y < h ? 0 : 2) + (x < h ? 0 : 1)] += Math.abs(a[i] - pv[i]); }
+    pv.set(a);
+    this.hist.push(dq); if (this.hist.length > 240) this.hist.shift();
+    if (this.hist.length < 60) { this.meter(null); return; }
+    const n = this.hist.length, mean = [0, 0, 0, 0];
+    for (const r of this.hist) for (let k = 0; k < 4; k++) mean[k] += r[k] / n;
+    const cov = (i, j) => { let s = 0; for (const r of this.hist) s += (r[i] - mean[i]) * (r[j] - mean[j]); return s / n; };
+    let c = 0, m = 0;
+    for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) { c += cov(i, j) / Math.sqrt(cov(i, i) * cov(j, j) + 1e-30); m++; }
+    this.meter(c / m);
+  }
+  tick() { this.step(); this.render(); }
+}
+
+// ---------------------------------------------------------------- Hilfen
+function hiDPI(cv) {
+  const r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(200, Math.round(r.width * d)), h = Math.round(w * cv.height / cv.width);
+  if (cv.width !== w) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext("2d"); return { ctx, w, h, d };
+}
+function bind(id, fmtFn, cb) {
+  const el = document.getElementById(id), out = document.getElementById(id + "o");
+  const upd = () => { if (out) out.textContent = fmtFn(+el.value); cb(+el.value); };
+  el.addEventListener("input", upd); upd(); return el;
+}
+const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let playing = !reduced;
+const anims = [];   // {visible, tick(t)}
+function addAnim(el, tick) { const a = { el, tick, visible: false }; anims.push(a); io.observe(el); return a; }
+const io = new IntersectionObserver(es => { for (const e of es) for (const a of anims) if (a.el === e.target) a.visible = e.isIntersecting; }, { rootMargin: "80px" });
+
+// ---------------------------------------------------------------- Hero
+const heroCv = document.getElementById("heroCv");
+const hero = new Caustic(heroCv, { D: 1.3 });
+function sizeHero() { const r = heroCv.getBoundingClientRect(); const s = Math.min(window.devicePixelRatio || 1, 1.5); heroCv.width = Math.round(r.width * s / 2); heroCv.height = Math.round(r.height * s / 2); hero.render(); }
+sizeHero(); window.addEventListener("resize", sizeHero);
+addAnim(heroCv, () => hero.tick());
+
+// ---------------------------------------------------------------- 1 Strahlengang
+const ray = { n2: 1.49, a: 0.25e-3, D: 1.0, t: 0 };
+const rayCv = document.getElementById("rayCv");
+function eta(x, t) {   // zwei Wellenzüge, rms = a
+  const k1 = 2 * Math.PI / 0.042, k2 = 2 * Math.PI / 0.031;
+  return ray.a * (Math.sin(k1 * x - 4.9 * t) + 0.75 * Math.sin(k2 * x + 5.6 * t + 1.3)) / Math.sqrt((1 + 0.5625) / 2);
+}
+function detaDx(x, t) {
+  const k1 = 2 * Math.PI / 0.042, k2 = 2 * Math.PI / 0.031;
+  return ray.a * (k1 * Math.cos(k1 * x - 4.9 * t) + 0.75 * k2 * Math.cos(k2 * x + 5.6 * t + 1.3)) / Math.sqrt((1 + 0.5625) / 2);
+}
+function drawRays() {
+  const { ctx, w, h } = hiDPI(rayCv), W = 0.16, t = ray.t;
+  ctx.fillStyle = "#020a0e"; ctx.fillRect(0, 0, w, h);
+  const yScr = h * 0.12, yLid = h * 0.52, yI = h * 0.70, yBot = h * 0.92, ex = (yI - yLid) * 0.55 / 0.6e-3;
+  const X = x => x / W * w;
+  // Schichten
+  ctx.beginPath(); ctx.moveTo(0, yBot);
+  for (let i = 0; i <= 200; i++) { const x = i / 200 * W; ctx.lineTo(X(x), yI - eta(x, t) * ex); }
+  ctx.lineTo(w, yBot); ctx.closePath(); ctx.fillStyle = "rgba(44,110,155,.35)"; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0, yLid);
+  for (let i = 0; i <= 200; i++) { const x = i / 200 * W; ctx.lineTo(X(x), yI - eta(x, t) * ex); }
+  ctx.lineTo(w, yLid); ctx.closePath(); ctx.fillStyle = "rgba(200,140,40,.22)"; ctx.fill();
+  ctx.fillStyle = "rgba(220,235,240,.18)"; ctx.fillRect(0, yLid - 5, w, 5); ctx.fillRect(0, yBot, w, 5);
+  // Strahlen
+  const nR = 170, hits = new Float32Array(200), dn = ray.n2 / N1;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < nR; i++) {
+    const x = (i + 0.5) / nR * W, s = detaDx(x, t);
+    // Snell an der Grenzfläche (Wasser -> Öl), Strahl senkrecht nach oben
+    const nx = -s / Math.hypot(s, 1), ny = 1 / Math.hypot(s, 1);
+    const cosi = ny, eta12 = N1 / ray.n2, k = 1 - eta12 * eta12 * (1 - cosi * cosi);
+    // t = η·d − (η·cosθ − √k)·n  (n zeigt in Strahlrichtung)
+    const dx = -(eta12 * cosi - Math.sqrt(k)) * nx, dy = eta12 - (eta12 * cosi - Math.sqrt(k)) * ny;
+    // Deckel (waagerecht): Öl -> Luft
+    const sinO = dx / Math.hypot(dx, dy), sinA = Math.max(-0.99, Math.min(0.99, ray.n2 * sinO));
+    const tanA = sinA / Math.sqrt(1 - sinA * sinA);
+    const xLid = x + (0.012 - eta(x, t)) * dx / dy, xS = xLid + ray.D * tanA;
+    const bin = Math.floor(((xS % W) + W) % W / W * hits.length); hits[bin] += 1;
+    ctx.strokeStyle = "rgba(150,225,245,.20)";
+    ctx.beginPath(); ctx.moveTo(X(x), yBot); ctx.lineTo(X(x), yI - eta(x, t) * ex); ctx.lineTo(X(xLid), yLid); ctx.lineTo(X(xS), yScr); ctx.stroke();
+  }
+  // Decke: Intensität
+  const sm = new Float32Array(hits.length);
+  for (let i = 0; i < hits.length; i++) sm[i] = (hits[(i + 199) % 200] + 2 * hits[i] + hits[(i + 1) % 200]) / 4;
+  const mean = nR / hits.length;
+  for (let i = 0; i < hits.length; i++) { const [r, g, b] = lutColor(sm[i] / mean, 4); ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fillRect(i / hits.length * w, yScr - 22, w / hits.length + 1, 22); }
+  ctx.font = `600 ${Math.round(h * 0.034)}px "Familjen Grotesk", system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(214,232,238,.85)";
+  ctx.fillText(`Decke (Abstand D = ${fmt(ray.D, 2)} m)`, 10, yScr - 30);
+  ctx.fillText("Deckelglas", 10, yLid - 10);
+  ctx.fillStyle = "rgba(240,190,90,.9)"; ctx.fillText(`Öl  n₂ = ${fmt(ray.n2, 3)}`, 10, (yLid + yI) / 2);
+  ctx.fillStyle = "rgba(120,180,230,.95)"; ctx.fillText("Wasser  n₁ = 1,333", 10, (yI + yBot) / 2 + 8);
+  ctx.fillStyle = "rgba(214,232,238,.6)"; ctx.fillText("Licht vom Projektor ↑", 10, h - 6);
+}
+bind("r_n2", v => `${fmt(v, 3)}  (Δn ${fmt(v - N1, 3)})`, v => { ray.n2 = v; drawRays(); });
+bind("r_a", v => `${fmt(v, 2)} mm`, v => { ray.a = v * 1e-3; drawRays(); });
+bind("r_d", v => `${fmt(v, 2)} m`, v => { ray.D = v; drawRays(); });
+addAnim(rayCv, () => { ray.t += DT; drawRays(); });
+
+// ---------------------------------------------------------------- 2 Zeitlupe
+const slow = { bb: 0.42, lam: 0.04, t: 0 };
+const slowCv = document.getElementById("slowCv");
+function slowInfo() {
+  const b = blend(slow.bb), k = 2 * Math.PI / slow.lam;
+  const fp = Math.sqrt(G * k * Math.tanh(k * 1.5) + 0.072 * k ** 3 / 998) / 2 / Math.PI;
+  const fl = Math.sqrt(omega2(k, b.rho2, 0.08, 0.012, 0.002)) / 2 / Math.PI;
+  return { b, fp, fl };
+}
+function drawSlow() {
+  const { ctx, w, h } = hiDPI(slowCv), W = 0.20, { b, fp, fl } = slowInfo(), k = 2 * Math.PI / slow.lam;
+  ctx.fillStyle = "#020a0e"; ctx.fillRect(0, 0, w, h);
+  const rows = [{ y: h * 0.28, f: fp, top: "rgba(160,190,210,.06)", label: `Pool  ·  ${fmt(fp, 2)} Hz` }, { y: h * 0.74, f: fl, top: "rgba(200,140,40,.25)", label: `Lampe  ·  ${fmt(fl, 2)} Hz` }];
+  ctx.font = `600 ${Math.round(h * 0.06)}px "Familjen Grotesk", system-ui, sans-serif`;
+  for (const r of rows) {
+    const A = h * 0.07, ph = 2 * Math.PI * r.f * slow.t;
+    const yy = x => r.y - A * Math.sin(k * x - ph);
+    ctx.beginPath(); ctx.moveTo(0, r.y - h * 0.2);
+    for (let i = 0; i <= 240; i++) { const x = i / 240 * W; ctx.lineTo(i / 240 * w, yy(x)); }
+    ctx.lineTo(w, r.y - h * 0.2); ctx.closePath(); ctx.fillStyle = r.top; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0, r.y + h * 0.18);
+    for (let i = 0; i <= 240; i++) { const x = i / 240 * W; ctx.lineTo(i / 240 * w, yy(x)); }
+    ctx.lineTo(w, r.y + h * 0.18); ctx.closePath(); ctx.fillStyle = "rgba(44,110,155,.45)"; ctx.fill();
+    // Markierung: ein Wellenberg
+    const xc = ((ph / k) % W + W) % W;
+    ctx.fillStyle = "#8fe0f0"; ctx.beginPath(); ctx.arc((xc + slow.lam / 4) % W / W * w, r.y - A - 6, 4, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(214,232,238,.9)"; ctx.fillText(r.label, 10, r.y - h * 0.13);
+  }
+  if (b.rho2 >= RHO1) { ctx.fillStyle = "rgba(240,180,90,.95)"; ctx.fillText("Öl schwerer als Wasser: Schichtung kippt", 10, h - 8); }
+}
+function updSlow() {
+  const { b, fp, fl } = slowInfo(), dr = RHO1 - b.rho2;
+  document.getElementById("s_rho").textContent = `${fmt(b.rho2, 0)} kg/m³`;
+  document.getElementById("s_drho").textContent = `${fmt(dr, 0)} kg/m³`;
+  document.getElementById("s_g").textContent = dr > 0 ? `1 : ${fmt((RHO1 + b.rho2) / dr, 0)}` : "–";
+  document.getElementById("s_fp").textContent = `${fmt(fp, 2)} Hz`;
+  document.getElementById("s_fl").textContent = `${fmt(fl, 2)} Hz`;
+  document.getElementById("s_n").textContent = fmt(b.n2, 3);
+  drawSlow();
+}
+bind("s_bb", v => `${fmt(v * 100, 1)} %`, v => { slow.bb = v; updSlow(); });
+bind("s_lam", v => `${fmt(v, 1)} cm`, v => { slow.lam = v / 100; updSlow(); });
+addAnim(slowCv, () => { slow.t += DT; drawSlow(); });
+
+// ---------------------------------------------------------------- 3 Tensid + Dispersion
+const ten = { s: 0.95, bb: 0.42, t: 0 };
+const sigmaOf = s => 0.022 * Math.pow(10, -1.1 * s);    // illustrativ: 22 -> ~1,7 mN/m
+const molCv = document.getElementById("molCv"), dispCv = document.getElementById("dispCv");
+const molSeeds = Array.from({ length: 34 }, () => [Math.random(), Math.random(), Math.random()]);
+function drawMol() {
+  const { ctx, w, h } = hiDPI(molCv);
+  ctx.fillStyle = "rgba(200,140,40,.10)"; ctx.fillRect(0, 0, w, h / 2);
+  ctx.fillStyle = "rgba(44,110,155,.42)"; ctx.fillRect(0, h / 2, w, h / 2);
+  const y0 = x => h / 2 + Math.sin(x / w * 9 + ten.t * 1.4) * h * 0.035 * (1 - 0.6 * ten.s);
+  ctx.strokeStyle = "rgba(214,232,238,.7)"; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i <= 160; i++) { const x = i / 160 * w; i ? ctx.lineTo(x, y0(x)) : ctx.moveTo(x, y0(x)); } ctx.stroke();
+  const n = Math.round(ten.s * molSeeds.length);
+  for (let i = 0; i < n; i++) {
+    const [a, b2, c] = molSeeds[i], x = (a * w + Math.sin(ten.t * 0.6 + c * 6) * 4), y = y0(x);
+    const tilt = (b2 - 0.5) * 0.7;
+    ctx.strokeStyle = "rgba(240,190,90,.9)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + tilt * 18 + 4, y - h * 0.18, x + tilt * 26, y - h * 0.32); ctx.stroke();
+    ctx.fillStyle = "#8fe0f0"; ctx.beginPath(); ctx.arc(x, y + 4, 4.2, 0, 7); ctx.fill();
+  }
+  ctx.font = `600 ${Math.round(h * 0.13)}px "Familjen Grotesk", system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(240,190,90,.95)"; ctx.fillText("Öl", 10, h * 0.2);
+  ctx.fillStyle = "rgba(160,205,240,.95)"; ctx.fillText("Wasser", 10, h * 0.92);
+  ctx.fillStyle = "rgba(214,232,238,.75)"; ctx.textAlign = "right";
+  ctx.fillText("Kopf ins Wasser, Schwanz ins Öl", w - 10, h * 0.92); ctx.textAlign = "left";
+}
+function drawDisp() {
+  const { ctx, w, h } = hiDPI(dispCv), b = blend(ten.bb), s = sigmaOf(ten.s);
+  ctx.fillStyle = "#020a0e"; ctx.fillRect(0, 0, w, h);
+  const L0 = Math.log10(0.003), L1 = Math.log10(0.3), cMax = 0.08;
+  const pl = w * 0.1, pr = w * 0.03, pt = h * 0.06, pb = h * 0.14;
+  const X = lam => pl + (Math.log10(lam) - L0) / (L1 - L0) * (w - pl - pr), Y = c => h - pb - c / cMax * (h - pt - pb);
+  ctx.font = `500 ${Math.round(h * 0.042)}px "JetBrains Mono", ui-monospace, monospace`;
+  ctx.strokeStyle = "rgba(214,232,238,.08)"; ctx.fillStyle = "rgba(214,232,238,.6)"; ctx.lineWidth = 1;
+  for (const lam of [0.003, 0.01, 0.03, 0.1, 0.3]) { ctx.beginPath(); ctx.moveTo(X(lam), pt); ctx.lineTo(X(lam), h - pb); ctx.stroke(); ctx.textAlign = "center"; ctx.fillText(`${fmt(lam * 100, lam < 0.01 ? 1 : 0)} cm`, X(lam), h - pb + h * 0.06); }
+  for (let c = 0; c <= cMax + 1e-9; c += 0.02) { ctx.beginPath(); ctx.moveTo(pl, Y(c)); ctx.lineTo(w - pr, Y(c)); ctx.stroke(); ctx.textAlign = "right"; ctx.fillText(`${fmt(c * 100, 0)}`, pl - 6, Y(c) + 4); }
+  ctx.textAlign = "left"; ctx.fillText("cm/s", 4, pt + 4);
+  // Zielbereich 3-5 cm
+  ctx.fillStyle = "rgba(63,188,214,.10)"; ctx.fillRect(X(0.03), pt, X(0.05) - X(0.03), h - pt - pb);
+  const curve = (fn, style, dash, lw = 2) => {
+    ctx.strokeStyle = style; ctx.setLineDash(dash); ctx.lineWidth = lw; ctx.beginPath(); let started = false;
+    for (let i = 0; i <= 300; i++) { const lam = Math.pow(10, L0 + (L1 - L0) * i / 300), c = fn(lam); if (!isFinite(c) || c > cMax * 1.05) { started = false; continue; } const x = X(lam), y = Y(c); started ? ctx.lineTo(x, y) : ctx.moveTo(x, y); started = true; }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  const cOf = (lam, rho2, sg) => { const k = 2 * Math.PI / lam; return Math.sqrt(omega2(k, rho2, 0.08, 0.012, sg)) / k; };
+  curve(lam => cOf(lam, b.rho2, 0), "rgba(214,232,238,.45)", [6, 5], 1.5);
+  curve(lam => { const k = 2 * Math.PI / lam; return Math.sqrt(s * k ** 3 / (RHO1 * coth(k * 0.08) + b.rho2 * coth(k * 0.012))) / k; }, "rgba(240,190,90,.55)", [2, 4], 1.5);
+  curve(lam => cOf(lam, b.rho2, s), "#8fe0f0", [], 2.6);
+  // Minimum
+  let best = 1, bl = 0.01; for (let i = 0; i <= 400; i++) { const lam = Math.pow(10, L0 + (L1 - L0) * i / 400), c = cOf(lam, b.rho2, s); if (c < best) { best = c; bl = lam; } }
+  ctx.fillStyle = "#8fe0f0"; ctx.beginPath(); ctx.arc(X(bl), Y(best), 5, 0, 7); ctx.fill();
+  ctx.font = `600 ${Math.round(h * 0.045)}px "Familjen Grotesk", system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(214,232,238,.9)"; ctx.textAlign = "center";
+  ctx.fillText(`langsamste Welle: λ ${fmt(bl * 100, 1)} cm`, Math.min(Math.max(X(bl), w * 0.25), w * 0.75), Y(best) - h * 0.05);
+  ctx.textAlign = "left"; ctx.fillStyle = "rgba(214,232,238,.55)"; ctx.fillText("nur Schwerkraft", X(0.12), Y(cOf(0.12, b.rho2, 0)) - 8);
+  ctx.fillStyle = "rgba(240,190,90,.75)"; ctx.fillText("nur Haut (σ)", X(0.004), pt + h * 0.06);
+  ctx.fillStyle = "rgba(143,224,240,.8)"; ctx.fillText("unsere Wellen", X(0.03) + 4, pt + h * 0.06);
+}
+function updTen() {
+  const b = blend(ten.bb), s = sigmaOf(ten.s), dr = RHO1 - b.rho2, k = 2 * Math.PI / 0.04;
+  const lc = 2 * Math.PI * Math.sqrt(s / (dr * G));
+  document.getElementById("t_so").textContent = `${fmt(ten.s * 100, 0)} %`;
+  document.getElementById("t_sig").textContent = `${fmt(s * 1000, 1)} mN/m`;
+  document.getElementById("t_lc").textContent = `${fmt(lc * 100, 2)} cm`;
+  document.getElementById("t_ratio").textContent = `${fmt(dr * G / (s * k * k), 1)} : 1`;
+  const du = Math.sqrt(2 * (RHO1 + b.rho2) / (RHO1 * b.rho2) * Math.sqrt(G * dr * s));
+  document.getElementById("t_em").textContent = `${fmt(du * 100, 1)} cm/s`;
+  document.getElementById("t_emr").className = "ro " + (du < 0.03 ? "warn" : "good");
+  drawDisp(); drawMol();
+}
+bind("t_s", v => "", v => { ten.s = v; updTen(); });
+bind("t_bb", v => `${fmt(v * 100, 1)} %`, v => { ten.bb = v; updTen(); });
+addAnim(molCv, () => { ten.t += DT; drawMol(); });
+
+// ---------------------------------------------------------------- 4 Dämpfung
+const rip = { lam: 0.04, f: 1, t: 0 };
+const ripCv = document.getElementById("rippleCv");
+const ripOff = document.createElement("canvas"); ripOff.width = 280; ripOff.height = 120;
+const ripCtx = ripOff.getContext("2d"), ripImg = ripCtx.createImageData(280, 120);
+function ripInfo() { const b = blend(0.42); return waveInfo(rip.lam, b.rho2, b.nu2, 0.002, 0.08, 0.012, rip.f); }
+function drawRip() {
+  const { ctx, w, h } = hiDPI(ripCv), inf = ripInfo(), k = 2 * Math.PI / rip.lam, om = 2 * Math.PI * inf.f;
+  const W = 0.35, H = W * 120 / 280, d = ripImg.data;
+  for (let j = 0; j < 120; j++) for (let i = 0; i < 280; i++) {
+    const x = (i + 0.5) / 280 * W, y = (j + 0.5) / 120 * H - H / 2, r = Math.hypot(x, y) + 1e-4;
+    const env = Math.exp(-r / inf.Ld) / Math.sqrt(Math.max(r, rip.lam / 3) / rip.lam);
+    const v = Math.sin(k * r - om * rip.t) * env;
+    const I = Math.max(0, Math.min(4, 1 + 1.6 * v));
+    const [R, Gc, B] = lutColor(I, 3.2), o = (j * 280 + i) * 4;
+    d[o] = R; d[o + 1] = Gc; d[o + 2] = B; d[o + 3] = 255;
+  }
+  ripCtx.putImageData(ripImg, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(ripOff, 0, 0, w, h);
+  const X = x => x / W * w;
+  ctx.setLineDash([6, 6]); ctx.strokeStyle = "rgba(240,190,90,.9)"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(X(inf.Ld), 0); ctx.lineTo(X(inf.Ld), h); ctx.stroke();
+  ctx.strokeStyle = "rgba(214,232,238,.6)"; ctx.beginPath(); ctx.moveTo(X(0.175), 0); ctx.lineTo(X(0.175), h); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = `600 ${Math.round(h * 0.055)}px "Familjen Grotesk", system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(240,190,90,.95)"; ctx.fillText(`L_d = ${fmt(inf.Ld * 100, 1)} cm`, Math.min(X(inf.Ld) + 6, w - 120), h * 0.1);
+  ctx.fillStyle = "rgba(214,232,238,.85)"; ctx.fillText("Tankmitte", X(0.175) + 6, h * 0.94);
+  for (let c = 0; c <= 35; c += 5) { ctx.fillStyle = "rgba(214,232,238,.5)"; ctx.fillRect(X(c / 100), h - 6, 1, 6); }
+}
+function updRip() {
+  const inf = ripInfo(), mid = Math.exp(-0.175 / inf.Ld);
+  document.getElementById("d_fr").textContent = `${fmt(inf.f, 2)} Hz`;
+  document.getElementById("d_cg").textContent = `${fmt(inf.cg * 100, 1)} cm/s`;
+  document.getElementById("d_ld").textContent = `${fmt(inf.Ld * 100, 1)} cm`;
+  document.getElementById("d_mid").textContent = `${fmt(mid * 100, mid < 0.1 ? 1 : 0)} %`;
+  document.getElementById("d_midr").className = "ro " + (mid < 0.1 ? "warn" : "good");
+  drawRip();
+}
+bind("d_lam", v => `${fmt(v, 1)} cm`, v => { rip.lam = v / 100; updRip(); });
+bind("d_f", v => `× ${fmt(v, 2)}`, v => { rip.f = v; updRip(); });
+addAnim(ripCv, () => { rip.t += DT; drawRip(); });
+
+// ---------------------------------------------------------------- 5 Gleichtakt
+const GT = [["Echtes Pool-Video (Referenz)", 0.03], ["Wirrnetz, Zufallsantrieb", 0.33], ["Wirrnetz, gestaffelt + Drehung", 0.22],
+  ["Wirrnetz, „schwimmend“", 0.10], ["6 × 6 Lautsprecher-Zonen", 0.00], ["Turbulenz, Wirbel 1,2 cm", -0.01]];
+document.getElementById("gtTable").innerHTML = GT.map(([n, v]) =>
+  `<tr><td>${n}</td><td class="num mono">${fmt(v, 2)}</td><td><span class="bar-inline" style="width:${Math.max(2, v * 240)}px"></span></td></tr>`).join("");
+function meterFn(id) {
+  const bar = document.getElementById(id), val = document.getElementById(id + "_v");
+  return v => { if (v === null) { val.textContent = "…"; return; } bar.style.width = `${Math.max(0, Math.min(1, v)) * 100}%`; val.textContent = fmt(v, 2); };
+}
+const taktCv = document.getElementById("taktCv"), turbCv = document.getElementById("turbCv");
+const eTakt = new Caustic(taktCv, { drive: "takt", D: 1.3 }, meterFn("m_takt"));
+const eTurb = new Caustic(turbCv, { drive: "turb", D: 1.3 }, meterFn("m_turb"));
+addAnim(taktCv, () => eTakt.tick()); addAnim(turbCv, () => eTurb.tick());
+
+// ---------------------------------------------------------------- 6 Labor
+const labCv = document.getElementById("labCv");
+const lab = new Caustic(labCv, {}, meterFn("m_lab"));
+function updLab() {
+  const p = lab.p, b = blend(p.bb), dr = RHO1 - b.rho2, lam = 2 * Math.PI * p.ell;
+  const inf = waveInfo(lam, b.rho2, b.nu2, p.sigma, p.h1, p.h2, p.damp);
+  document.getElementById("o_drho").textContent = dr > 0 ? `${fmt(dr, 0)} kg/m³ · 1:${fmt((RHO1 + b.rho2) / dr, 0)}` : "Schichtung kippt";
+  document.getElementById("o_dn").textContent = fmt(b.n2 - N1, 3);
+  document.getElementById("o_lam").textContent = `${fmt(lam * 100, 1)} cm`;
+  document.getElementById("o_f").textContent = `${fmt(inf.f, 2)} Hz`;
+  document.getElementById("o_lc").textContent = `${fmt(2 * Math.PI * Math.sqrt(p.sigma / (Math.max(dr, 0.1) * G)) * 100, 2)} cm`;
+  document.getElementById("o_ld").textContent = `${fmt(inf.Ld * 100, 1)} cm`;
+  const u = Math.sqrt(p.amp / RHO1), du = Math.sqrt(2 * (RHO1 + b.rho2) / (RHO1 * b.rho2) * Math.sqrt(G * Math.max(dr, 0.1) * p.sigma));
+  document.getElementById("o_u").textContent = `~${fmt(u * 100, 1)} cm/s`;
+  document.getElementById("o_em").textContent = `${fmt(du * 100, 1)} cm/s`;
+  document.getElementById("o_emr").className = "ro " + (du < 4 * u ? "warn" : "good");
+}
+const labSet = o => { lab.set(o); updLab(); };
+bind("l_bb", v => `${fmt(v * 100, 1)} %`, v => labSet({ bb: Math.min(v, 0.54) }));
+bind("l_sig", v => `${fmt(v, 1)} mN/m`, v => labSet({ sigma: v / 1000 }));
+bind("l_ell", v => `${fmt(v, 2)} cm`, v => labSet({ ell: v / 100 }));
+bind("l_amp", v => `${fmt(v, 3)} Pa`, v => labSet({ amp: v }));
+bind("l_d", v => `${fmt(v, 2)} m`, v => labSet({ D: v }));
+bind("l_damp", v => `× ${fmt(v, 2)}`, v => labSet({ damp: v }));
+const bT = document.getElementById("l_turb"), bK = document.getElementById("l_takt");
+bT.addEventListener("click", () => { bT.setAttribute("aria-pressed", "true"); bK.setAttribute("aria-pressed", "false"); labSet({ drive: "turb" }); });
+bK.addEventListener("click", () => { bK.setAttribute("aria-pressed", "true"); bT.setAttribute("aria-pressed", "false"); labSet({ drive: "takt" }); });
+addAnim(labCv, () => { lab.tick(); document.getElementById("o_sl").textContent = fmt(lab.slope, 3); });
+updLab();
+
+// ---------------------------------------------------------------- Schleife
+const playBtn = document.getElementById("playBtn");
+function setPlay(v) { playing = v; playBtn.textContent = v ? "Pause" : "Abspielen"; }
+setPlay(playing);
+playBtn.addEventListener("click", () => setPlay(!playing));
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (!playing || t - last < 1000 / 31) return;
+  last = t;
+  for (const a of anims) if (a.visible) a.tick();
+}
+requestAnimationFrame(loop);
+window.addEventListener("resize", () => { drawRays(); drawSlow(); drawMol(); drawDisp(); drawRip(); });
+
+  })();
+}
+function showTab(name) {
+  const phys = name === "physik";
+  protoPane.hidden = phys; physPane.hidden = !phys;
+  document.getElementById("t-proto").setAttribute("aria-selected", String(!phys));
+  document.getElementById("t-physik").setAttribute("aria-selected", String(phys));
+  if (phys) startPhysik();
+  window.scrollTo(0, 0);
+  requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+}
+document.getElementById("t-proto").addEventListener("click", () => showTab("proto"));
+document.getElementById("t-physik").addEventListener("click", () => showTab("physik"));
+if (location.hash === "#physik") showTab("physik");
+</script>
+
+</body>
+</html>
